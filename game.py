@@ -233,7 +233,11 @@ class Game:
         print("GAME OVER")
         self.__game_running = False
 
-    def move_player(self, ):
+    def move_player(self, player_name, move_to):
+        for player in self.__players:
+            if player.has_name(player_name):
+                player.set_city(move_to)
+                break
 
     def run_game(self):
         self.__game_running = True

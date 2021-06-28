@@ -70,6 +70,9 @@ class Player(GameObject):
             self.__hand_image[i].undraw()
             self.__hand_image[i].draw(self.window)
 
+    def has_name(self, name):
+        return self.__name == name
+
     def is_clicked(self, mouse_x, mouse_y):
         start_x = 20 + 20*self.__draw_offset
         start_y = 390
