@@ -2,15 +2,17 @@ from gameobject import GameObject
 from city import City
 from graphics import *
 
+
 class Player(GameObject):
 
     def __init__(self, name, window, city, colour, draw_offset):
+        self.__colour = colour
         self.__city = city
         self.__name = name
         self.__draw_offset = draw_offset
         super().__init__(window, self.__city.get_x(), self.__city.get_y())
         self.__pawn = Circle(Point(self.x + 15 + self.__draw_offset, self.y), 5)
-        self.__pawn.setFill(colour)
+        self.__pawn.setFill(self.__colour)
 
         self.__text = Text(Point(50 + 20*self.__draw_offset, 400), self.__name)
         self.__click_box = Rectangle(Point(20 + 20*self.__draw_offset, 390), Point(80 + 20*self.__draw_offset, 410))
@@ -20,6 +22,21 @@ class Player(GameObject):
         self.__hand_image = []
 
         self.__cards_in_hand = 0
+
+    def get_city(self):
+        return self.__city
+
+    def get_city_name(self):
+        return self.__city.get_name()
+
+    def get_connected_cities(self):
+        return self.__city.get_connected_cities()
+
+    def get_hand(self):
+        return self.__hand
+
+    def get_hand_size(self):
+        return self.__cards_in_hand
 
     def get_name(self):
         return self.__name
@@ -59,6 +76,8 @@ class Player(GameObject):
 
     def draw(self):
         self.__pawn.undraw()
+        self.__pawn = Circle(Point(self.x + 15 + self.__draw_offset, self.y), 5)
+        self.__pawn.setFill(self.__colour)
         self.__pawn.draw(self.window)
 
         self.__click_box.undraw()
@@ -73,7 +92,36 @@ class Player(GameObject):
     def has_name(self, name):
         return self.__name == name
 
+    def is_city_in_hand(self):
+        for card in self.__hand:
+            if card.get_name() == self.__city.get_name():
+                return True
+        return False
+
     def is_clicked(self, mouse_x, mouse_y):
         start_x = 20 + 20*self.__draw_offset
         start_y = 390
         return (start_x <= mouse_x) and (mouse_x <= start_x + 60) and (start_y <= mouse_y) and (mouse_y <= start_y + 20)
+
+    def move_to(self, new_city):
+        self.__city = new_city
+        self.x = self.__city.get_x()
+        self.y = self.__city.get_y()
+        self.draw()
+
+    def remove_card_by_name(self, card_name):
+        removed = False
+        i = 0
+        while i < self.__cards_in_hand:
+            if removed:
+                self.__hand_image[i].move(0, -15)
+            if self.__hand[i].has_name(card_name):
+                self.__hand_image[i].undraw()
+                del self.__hand[i]
+                del self.__hand_image[i]
+                self.__cards_in_hand -= 1
+                removed = True
+            else:
+                i += 1
+
+        return removed

@@ -36,6 +36,8 @@ class City(GameObject):
         self.__image.setFill(self.__colour)
         self.__image.setOutline(self.__colour)
 
+        self.__name_text = Text(Point(self.x, self.y + self.__radius + 5), self.__name)
+
     def get_center(self):
         return self.__center
 
@@ -45,9 +47,14 @@ class City(GameObject):
     def get_connected_cities(self):
         return self.__connected_cities.copy()
 
+    def get_cubes(self, colour):
+        return self.__cubes[colour]
+
     def get_name(self):
         return self.__name
 
+    def has_name(self, name):
+        return self.__name == name
 
     def set_connected_cities(self, to_set):
         self.__connected_cities = to_set.copy()
@@ -68,9 +75,11 @@ class City(GameObject):
         self.inc_cubes(self.__colour)
 
     def draw_city(self):
+        self.__image.undraw()
         self.__image.draw(self.window)
-        city_name = Text(Point(self.x, self.y + self.__radius + 5), self.__name)
-        city_name.draw(self.window)
+        self.__name_text.undraw()
+        self.__name_text.draw(self.window)
+        self.__res_station_image.undraw()
         if self.__has_res_station:
             self.__res_station_image.draw(self.window)
 
@@ -94,6 +103,18 @@ class City(GameObject):
 
     def equals(self, to_check):
         return self.__name == to_check.get_name()
+
+    def has_research_station(self):
+        return self.__has_res_station
+
+    def dec_cubes(self, colour):
+        if self.__cubes[colour] > 0:
+            if self.__game.is_cured(colour):
+                self.__cubes[colour] = 0
+            else:
+                self.__cubes[colour] -= 1
+            self.__cube_text[colour].setText(str(self.__cubes[colour]))
+            self.draw_cubes()
 
     def inc_cubes(self, colour):
         if self.__cubes[colour] >= 3:

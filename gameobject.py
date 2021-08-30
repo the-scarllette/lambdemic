@@ -22,5 +22,5 @@ class GameObject:
     def click(self):
         return
 
-    def draw_object(self):
+    def draw(self):
         return
