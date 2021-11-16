@@ -6,7 +6,7 @@ hight = 600
 
 window = GraphWin("Pandemicai", width, hight)
 
-game = Game(window, 'random')
+game = Game(window, 'random', True, False)
 game.draw_game()
 
 game.run_game()

@@ -6,15 +6,22 @@ from citycard import CityCard
 from nextturnbutton import NextTurnButton
 from curetracker import CureTracker
 from random import randint, choice
+from deck import Deck
 
 
 class Game:
 
-    def __init__(self, window, mode):
+    def __init__(self, window, mode, use_graphics, auto_run):
         self.__window = window
         self.__outbreak_tracker = OutbreakTracker(self.__window)
         self.__game_running = False
         self.__mode = mode
+        self.__auto_run = auto_run
+
+        self.__epidemics = 4
+        self.__infection_rate_track = [2, 2, 2, 3, 3, 4, 4]
+        self.__infection_rate_index = 0
+        self.__infection_rate = self.__infection_rate_track[self.__infection_rate_index]
 
         atlanta = City("Atlanta", "blue", [], self.__window, 150, 200, self)
         san_francisco = City("San Francisco", "blue", [], self.__window, 50, 150, self)
@@ -59,7 +66,7 @@ class Game:
         shanghai = City("Shanghai", "red", [], self.__window, 730, 170, self)
         hong_kong = City("Hong Kong", "red", [], self.__window, 740, 210, self)
         bangkok = City("Bangkok", "red", [], self.__window, 740, 270, self)
-        jakarta = City("Kakarta", "red", [], self.__window, 730, 340, self)
+        jakarta = City("Jakarta", "red", [], self.__window, 730, 340, self)
         ho_chi_min = City("Ho Chi\nMin City", "red", [], self.__window, 800, 300, self)
         sydney = City("Sydney", "red", [], self.__window, 850, 400, self)
         manila = City("Manila", "red", [], self.__window, 850, 270, self)
@@ -184,12 +191,18 @@ class Game:
 
         self.__next_turn_button = NextTurnButton(self.__window, 650, 400)
 
-        self.__deck = []
+        self.__infection_deck = Deck(self.__window, 900, 10)
+        self.__player_deck = Deck(self.__window, 10, 400)
         for city in self.__cities:
-            self.__deck.append(CityCard(city))
+            self.__infection_deck.add_card(CityCard(city))
+            self.__player_deck.add_card(CityCard(city))
+        self.__infection_deck.shuffle()
+        self.__player_deck.shuffle()
 
         self.colours = ["blue", "yellow", "black", "red"]
         self.__cure_trackers = [CureTracker(self.__window, self.colours[i], 20*(i+1), 10) for i in range(4)]
+
+        self.setup_game()
         return
 
     def get_cities(self):
@@ -263,6 +276,17 @@ class Game:
         else:
             print("Invalid choice")
 
+    def epidemic(self):
+        self.__infection_rate_index += 1
+        self.__infection_rate = self.__infection_rate_track[self.__infection_rate_index]
+        card = self.__infection_deck.draw_bottom_card()
+        city = self.find_city_by_name(card.get_name())
+        for i in range(3):
+            city.inc_cubes(city.get_colour())
+        self.__infection_deck.discard_card(card)
+        self.__infection_deck.restack_discard_pile()
+        print(city.get_name() + " had an epidemic")
+
     def end_game(self):
         print("GAME OVER")
         self.__game_running = False
@@ -275,6 +299,16 @@ class Game:
 
     def is_cured(self, colour):
         return colour in self.__cured
+
+    def player_draw_cards(self, player):
+        for i in range(2):
+            card = self.__player_deck.draw_card()
+            if card.is_epidemic:
+                self.epidemic()
+                continue
+            player.add_to_hand(card)
+            print("Gave " + player.get_name() + " " + card.get_name())
+            player.draw()
 
     def next_turn(self):
         if self.__mode == 'random':
@@ -426,12 +460,20 @@ class Game:
                     if player.get_hand_size() > 7:
                         self.discard_to_hand_limit(player)
                 self.next_turn()
+                self.player_draw_cards(self.__players[self.__current_turn])
+                self.infect_cities()
                 self.__current_turn = (self.__current_turn + 1) % len(self.__players)
 
     def inc_outbreaks(self):
         self.__outbreak_tracker.inc_outbreaks()
         if self.__outbreak_tracker.get_outbreaks() >= 8:
             self.end_game()
+
+    def infect_cities(self):
+        for i in range(self.__infection_rate):
+            city = self.find_city_by_name(self.__infection_deck.draw_and_discard().get_name())
+            city.inc_cubes(city.get_colour())
+            print(city.get_name() + " infected")
 
     def is_cured(self, colour):
         for tracker in self.__cure_trackers:
@@ -442,3 +484,21 @@ class Game:
     def reset_outbreaks(self):
         for city in self.__cities:
             city.set_has_outbreaked(False)
+
+    def setup_game(self):
+        #Placing initial cards
+        for cubes_to_place in range(1, 4):
+            for i in range(3):
+                city = self.find_city_by_name(self.__infection_deck.draw_and_discard().get_name())
+                for j in range(cubes_to_place):
+                    city.inc_cubes(city.get_colour())
+                print(city.get_name() + " has " + str(cubes_to_place) + " cubes")
+
+        #Dealing cards to players
+        for player in self.__players:
+            for i in range(4):
+                player.add_to_hand(self.__player_deck.draw_and_discard())
+
+        #Shuffling in Epidemics
+        self.__player_deck.add_epidemics(self.__epidemics)
+        return
