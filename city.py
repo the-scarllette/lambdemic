@@ -75,6 +75,8 @@ class City(GameObject):
         self.inc_cubes(self.__colour)
 
     def draw_city(self):
+        if self.window is None:
+            return
         self.__image.undraw()
         self.__image.draw(self.window)
         self.__name_text.undraw()
@@ -84,6 +86,8 @@ class City(GameObject):
             self.__res_station_image.draw(self.window)
 
     def draw_cubes(self):
+        if self.window is None:
+            return
         for cube_text in self.__cube_text.values():
             cube_text.undraw()
             cube_text.draw(self.window)

@@ -11,6 +11,8 @@ class CureTracker(GameObject):
         self.__cured = False
 
     def draw(self):
+        if self.window is None:
+            return
         self.__image.undraw()
         if self.__cured:
             self.__image.draw(self.window)

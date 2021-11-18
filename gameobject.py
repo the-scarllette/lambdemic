@@ -23,4 +23,6 @@ class GameObject:
         return
 
     def draw(self):
+        if self.window is None:
+            return
         return

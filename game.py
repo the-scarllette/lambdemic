@@ -11,17 +11,24 @@ from deck import Deck
 
 class Game:
 
-    def __init__(self, window, mode, use_graphics, auto_run):
+    def __init__(self, window, mode, agent, use_graphics, auto_run, print_results):
         self.__window = window
+        self.__use_graphics = use_graphics
+        if not self.__use_graphics and self.__window is not None:
+            self.__window.close()
+            self.__window = None
         self.__outbreak_tracker = OutbreakTracker(self.__window)
         self.__game_running = False
         self.__mode = mode
+        self.__player = agent
         self.__auto_run = auto_run
+        self.__print_results = print_results
 
         self.__epidemics = 4
         self.__infection_rate_track = [2, 2, 2, 3, 3, 4, 4]
         self.__infection_rate_index = 0
         self.__infection_rate = self.__infection_rate_track[self.__infection_rate_index]
+        self.__epidemic_count = 0
 
         atlanta = City("Atlanta", "blue", [], self.__window, 150, 200, self)
         san_francisco = City("San Francisco", "blue", [], self.__window, 50, 150, self)
@@ -128,6 +135,7 @@ class Game:
         ho_chi_min.set_connected_cities([hong_kong, manila, jakarta, bangkok])
         sydney.set_connected_cities([manila, los_angeles])
         manila.set_connected_cities([taipei, san_francisco, sydney, ho_chi_min, hong_kong])
+        taipei.set_connected_cities([shanghai, osaka, manila, hong_kong])
         osaka.set_connected_cities([tokyo, taipei])
         tokyo.set_connected_cities([san_francisco, osaka, shanghai, seoul])
         seoul.set_connected_cities([tokyo, shanghai, beijing])
@@ -205,6 +213,9 @@ class Game:
         self.setup_game()
         return
 
+    def find_path(self, start_city, end_city, cards_to_use=[]):
+        #uses dijingstra to find path
+
     def get_cities(self):
         return self.__cities
 
@@ -243,7 +254,6 @@ class Game:
                 player.discard_card_by_name(to_discard)
                 removed_str += (to_discard + " ")
                 cards_in_hand -= 1
-        print("Removed " + removed_str + "from " + player.get_name() + "'s hand")
 
     def draw_cures(self):
         for tracker in self.__cure_trackers:
@@ -251,6 +261,10 @@ class Game:
         return
 
     def draw_game(self):
+        if not self.__use_graphics:
+            return
+        if self.__window is None:
+            return
         for city in self.__cities:
             city.draw_paths()
         for city in self.__cities:
@@ -285,11 +299,11 @@ class Game:
             city.inc_cubes(city.get_colour())
         self.__infection_deck.discard_card(card)
         self.__infection_deck.restack_discard_pile()
-        print(city.get_name() + " had an epidemic")
+        self.__epidemic_count += 1
 
     def end_game(self):
-        print("GAME OVER")
         self.__game_running = False
+        return
 
     def find_city_by_name(self, search_name):
         for city in self.__cities:
@@ -307,140 +321,77 @@ class Game:
                 self.epidemic()
                 continue
             player.add_to_hand(card)
-            print("Gave " + player.get_name() + " " + card.get_name())
             player.draw()
 
     def next_turn(self):
         if self.__mode == 'random':
-            print("Making random moves")
-            for n in range(4):
-                '''Chooses random number to determine what move to tak
-                0 - Drive/Ferry
-                1 - Direct Flight
-                2 - Charter Flight
-                3 - Shuttle Flight
-                4 - Build Research Station
-                5 - Treat Disease
-                6 - Share Knowledge
-                7 - Discover Cure
-                if unable to take that action, repeats process until it can take an action'''
-                move_made = False
-                available_moves = [x for x in range(8)]
-                acting_player = self.__players[self.__current_turn]
-                cards = acting_player.get_hand()
-                current_city = acting_player.get_city()
-                while not move_made:
-                    move = choice(available_moves)
-                    if move == 0: # Drive/Ferry
-                        new_city = choice(acting_player.get_connected_cities())
-                        acting_player.move_to(new_city)
-                        move_made = True
-                        print("Moving " + acting_player.get_name() + " to " + new_city.get_name())
-                    elif move == 1: # Direct Flight
-                        if not cards:
-                            available_moves.remove(1)
-                            continue
-                        card_to_use = choice(cards)
-                        acting_player.discard_card_by_name(card_to_use.get_name())
-                        acting_player.move_to(self.find_city_by_name(card_to_use.get_name()))
-                        print("Direct flight of " + acting_player.get_name() + " to " + card_to_use.get_name())
-                        move_made = True
-                    elif move == 2: # Charter Flight
-                        if not acting_player.is_city_in_hand():
-                            available_moves.remove(2)
-                            continue
-                        acting_player.discard_card_by_name(acting_player.get_city_name())
-                        acting_player.move_to(choice(self.__cities))
-                        move_made = True
-                        print("Charter flight of " + acting_player.get_name() + " to " + acting_player.get_city_name())
-                    elif move == 3: # Shuttle Flight
-                        if len(self.__research_stations) <= 1 or not current_city.has_research_station():
-                            available_moves.remove(3)
-                            continue
-                        move_to = current_city
-                        while move_to.equals(current_city):
-                            move_to = choice(self.__research_stations)
-                        acting_player.move_to(move_to)
-                        move_made = True
-                        print("Shuttle flight of " + acting_player.get_name() + " to " + acting_player.get_city_name())
-                    elif move == 4: # Build Research Station
-                        if current_city.has_research_station() or not acting_player.is_city_in_hand():
-                            available_moves.remove(4)
-                            continue
-                        acting_player.discard_card_by_name(current_city.get_name())
-                        current_city.set_has_res_station(True)
-                        current_city.draw_city()
-                        current_city.draw_cubes()
-                        move_made = True
-                        print("Research station built by " + acting_player.get_name() + " at " + current_city.get_name())
-                    elif move == 5: # Treat Disease
-                        colours = ["blue", "yellow", "black", "red"]
-                        found_colour = False
-                        while colours and not found_colour:
-                            to_treat = choice(colours)
-                            if current_city.get_cubes(to_treat) > 0:
-                                found_colour = True
-                            else:
-                                colours.remove(to_treat)
-                        if not found_colour:
-                            available_moves.remove(5)
-                            continue
-                        current_city.dec_cubes(to_treat)
-                        move_made = True
-                        print("Treated " + to_treat + " by " + acting_player.get_name() + " at " + current_city.get_name())
-                    elif move == 6: # Share Knowledge
-                        other_player = self.__players[(self.__current_turn + 1) % len(self.__players)]
-                        if current_city.equals(other_player.get_city()):
-                            giving_player = -1
-                            if acting_player.is_city_in_hand():
-                                giving_player = acting_player
-                                taking_player = other_player
-                            elif other_player.is_city_in_hand():
-                                giving_player = other_player
-                                taking_player = acting_player
-                            if giving_player != -1:
-                                giving_player.remove_card_by_name(current_city.get_name())
-                                taking_player.add_to_hand(CityCard(current_city))
-                                giving_player.draw()
-                                taking_player.draw()
-                                move_made = True
-                                continue
-                        available_moves.remove(6)
-                    elif move == 7: # Discover Cure
-                        if not current_city.has_research_station():
-                            available_moves.remove(7)
-                            continue
-                        colours = {"blue" : 0, "yellow" : 0, "black" : 0, "red" : 0}
-                        found_colour = False
-                        for card in cards:
-                            colour = card.get_colour()
-                            colours[colour] += 1
-                            if colours[colour] >= 5:
-                                if not self.is_cured(colour):
-                                    found_colour = True
-                                    break
+            self.random_turn()
+            return
 
-                        if not found_colour:
-                            available_moves.remove(7)
-                            continue
+        self.__player.act()
 
-                        self.cure_disease(colour)
-                        self.draw_cures()
-                        i = 1
-                        while i <= 5:
-                            to_discard = choice(cards)
-                            if to_discard.get_colour() == colour:
-                                acting_player.discard_card_by_name(to_discard.get_name())
-                                i += 1
-                        acting_player.draw()
-                        move_made = True
-                        print("Cured " + colour + " by " + acting_player.get_name())
+        return
 
+    def print_results(self):
+        '''Infection rate
+        diseases cured
+        epidemics drawn
+        infected cities
+        outbreak track
+        number of cubes
+        '''
 
+        cured_string = ""
+        game_won = True
+        for cure_tracker in self.__cure_trackers:
+            if cure_tracker.is_cured():
+                cured_string = "cured"
+            else:
+                game_won = False
+                cured_string = "not cured"
+            print(cure_tracker.get_colour() + " is " + cured_string)
+        if game_won:
+            print("Game won")
+        else:
+            print("Game lost")
+
+        print("Infection rate at " + str(self.__infection_rate))
+
+        print("Epidemics drawn " + str(self.__epidemic_count))
+
+        for city in self.__cities:
+            for colour in self.colours:
+                count = city.get_cubes(colour)
+                if count > 0:
+                    print(city.get_name() + " has " + str(count) + " " + colour + " cubes")
+
+        print("Outbreak track at " + str(self.__outbreak_tracker.get_outbreaks()))
+        return
 
     def run_game(self):
         self.__game_running = True
 
+        if self.__auto_run:
+            self.run_game_auto()
+        else:
+            self.ran_game_manual()
+
+        if self.__print_results:
+            self.print_results()
+        return
+
+    def run_game_auto(self):
+        while self.__game_running:
+            print("Player takes turn")
+            self.next_turn()
+            print("Change game state")
+            self.player_draw_cards(self.__players[self.__current_turn])
+            self.infect_cities()
+            print("Player updatting state")
+            self.__current_turn = (self.__current_turn + 1) % len(self.__players)
+        return
+
+    def run_game_manual(self):
         while self.__game_running:
             try:
                 click = self.__window.getMouse()
@@ -463,6 +414,7 @@ class Game:
                 self.player_draw_cards(self.__players[self.__current_turn])
                 self.infect_cities()
                 self.__current_turn = (self.__current_turn + 1) % len(self.__players)
+        return
 
     def inc_outbreaks(self):
         self.__outbreak_tracker.inc_outbreaks()
@@ -480,6 +432,130 @@ class Game:
             if tracker.get_colour() == colour:
                 return tracker.is_cured()
 
+    def random_turn(self):
+        print("Making random moves")
+        for n in range(4):
+            '''Chooses random number to determine what move to tak
+            0 - Drive/Ferry
+            1 - Direct Flight
+            2 - Charter Flight
+            3 - Shuttle Flight
+            4 - Build Research Station
+            5 - Treat Disease
+            6 - Share Knowledge
+            7 - Discover Cure
+            if unable to take that action, repeats process until it can take an action'''
+            move_made = False
+            available_moves = [x for x in range(8)]
+            acting_player = self.__players[self.__current_turn]
+            cards = acting_player.get_hand()
+            current_city = acting_player.get_city()
+            while not move_made:
+                move = choice(available_moves)
+                if move == 0:  # Drive/Ferry
+                    new_city = choice(acting_player.get_connected_cities())
+                    acting_player.move_to(new_city)
+                    move_made = True
+                    print("Moving " + acting_player.get_name() + " to " + new_city.get_name())
+                elif move == 1:  # Direct Flight
+                    if not cards:
+                        available_moves.remove(1)
+                        continue
+                    card_to_use = choice(cards)
+                    acting_player.discard_card_by_name(card_to_use.get_name())
+                    acting_player.move_to(self.find_city_by_name(card_to_use.get_name()))
+                    print("Direct flight of " + acting_player.get_name() + " to " + card_to_use.get_name())
+                    move_made = True
+                elif move == 2:  # Charter Flight
+                    if not acting_player.is_city_in_hand():
+                        available_moves.remove(2)
+                        continue
+                    acting_player.discard_card_by_name(acting_player.get_city_name())
+                    acting_player.move_to(choice(self.__cities))
+                    move_made = True
+                    print("Charter flight of " + acting_player.get_name() + " to " + acting_player.get_city_name())
+                elif move == 3:  # Shuttle Flight
+                    if len(self.__research_stations) <= 1 or not current_city.has_research_station():
+                        available_moves.remove(3)
+                        continue
+                    move_to = current_city
+                    while move_to.equals(current_city):
+                        move_to = choice(self.__research_stations)
+                    acting_player.move_to(move_to)
+                    move_made = True
+                    print("Shuttle flight of " + acting_player.get_name() + " to " + acting_player.get_city_name())
+                elif move == 4:  # Build Research Station
+                    if current_city.has_research_station() or not acting_player.is_city_in_hand():
+                        available_moves.remove(4)
+                        continue
+                    acting_player.discard_card_by_name(current_city.get_name())
+                    current_city.set_has_res_station(True)
+                    current_city.draw_city()
+                    current_city.draw_cubes()
+                    move_made = True
+                    print("Research station built by " + acting_player.get_name() + " at " + current_city.get_name())
+                elif move == 5:  # Treat Disease
+                    colours = ["blue", "yellow", "black", "red"]
+                    found_colour = False
+                    while colours and not found_colour:
+                        to_treat = choice(colours)
+                        if current_city.get_cubes(to_treat) > 0:
+                            found_colour = True
+                        else:
+                            colours.remove(to_treat)
+                    if not found_colour:
+                        available_moves.remove(5)
+                        continue
+                    current_city.dec_cubes(to_treat)
+                    move_made = True
+                    print("Treated " + to_treat + " by " + acting_player.get_name() + " at " + current_city.get_name())
+                elif move == 6:  # Share Knowledge
+                    other_player = self.__players[(self.__current_turn + 1) % len(self.__players)]
+                    if current_city.equals(other_player.get_city()):
+                        giving_player = -1
+                        if acting_player.is_city_in_hand():
+                            giving_player = acting_player
+                            taking_player = other_player
+                        elif other_player.is_city_in_hand():
+                            giving_player = other_player
+                            taking_player = acting_player
+                        if giving_player != -1:
+                            giving_player.remove_card_by_name(current_city.get_name())
+                            taking_player.add_to_hand(CityCard(current_city))
+                            giving_player.draw()
+                            taking_player.draw()
+                            move_made = True
+                            continue
+                    available_moves.remove(6)
+                elif move == 7:  # Discover Cure
+                    if not current_city.has_research_station():
+                        available_moves.remove(7)
+                        continue
+                    colours = {"blue": 0, "yellow": 0, "black": 0, "red": 0}
+                    found_colour = False
+                    for card in cards:
+                        colour = card.get_colour()
+                        colours[colour] += 1
+                        if colours[colour] >= 5:
+                            if not self.is_cured(colour):
+                                found_colour = True
+                                break
+
+                    if not found_colour:
+                        available_moves.remove(7)
+                        continue
+
+                    self.cure_disease(colour)
+                    self.draw_cures()
+                    i = 1
+                    while i <= 5:
+                        to_discard = choice(cards)
+                        if to_discard.get_colour() == colour:
+                            acting_player.discard_card_by_name(to_discard.get_name())
+                            i += 1
+                    acting_player.draw()
+                    move_made = True
+                    print("Cured " + colour + " by " + acting_player.get_name())
 
     def reset_outbreaks(self):
         for city in self.__cities:

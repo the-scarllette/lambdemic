@@ -12,6 +12,8 @@ class NextTurnButton(GameObject):
         self.__box.setFill('Red')
 
     def draw(self):
+        if self.window is None:
+            return
         self.__box.draw(self.window)
         self.__text.draw(self.window)
 

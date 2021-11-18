@@ -14,6 +14,8 @@ class OutbreakTracker(GameObject):
         return self.__outbreaks
 
     def draw(self):
+        if self.window is None:
+            return
         self.__image.draw(self.window)
         self.__text.draw(self.window)
 

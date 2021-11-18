@@ -23,6 +23,9 @@ class Player(GameObject):
 
         self.__cards_in_hand = 0
 
+    def act(self):
+        return
+
     def get_city(self):
         return self.__city
 
@@ -75,6 +78,8 @@ class Player(GameObject):
         return discarded
 
     def draw(self):
+        if self.window is None:
+            return
         self.__pawn.undraw()
         self.__pawn = Circle(Point(self.x + 15 + self.__draw_offset, self.y), 5)
         self.__pawn.setFill(self.__colour)

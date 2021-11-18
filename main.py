@@ -4,9 +4,17 @@ from graphics import *
 width = 1000
 hight = 600
 
-window = GraphWin("Pandemicai", width, hight)
+use_graphics = False
 
-game = Game(window, 'random', True, False)
-game.draw_game()
+window = None
+if use_graphics:
+    window = GraphWin("Pandemicai", width, hight)
+
+agent = None
+
+game = Game(window, 'random', agent, use_graphics, True, True)
+
+if use_graphics:
+    game.draw_game()
 
 game.run_game()
