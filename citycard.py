@@ -8,5 +8,8 @@ class CityCard(Card):
         super().__init__(self.__city.get_name())
         self.is_epidemic = False
 
+    def get_city(self):
+        return self.__city
+
     def get_colour(self):
         return self.__city.get_colour()

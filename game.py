@@ -7,6 +7,7 @@ from nextturnbutton import NextTurnButton
 from curetracker import CureTracker
 from random import randint, choice
 from deck import Deck
+from pathnode import PathNode
 
 
 class Game:
@@ -35,7 +36,7 @@ class Game:
         chicago = City("Chicago", "blue", [], self.__window, 150, 150, self)
         montreal = City("montreal", "blue", [], self.__window, 250, 150, self)
         washington = City("Washington", "blue", [], self.__window, 250, 200, self)
-        new_york = City("New Work", "blue", [], self.__window, 300, 170, self)
+        new_york = City("New York", "blue", [], self.__window, 300, 170, self)
         london = City("London", "blue", [], self.__window, 400, 150, self)
         essen = City("Essen", "blue", [], self.__window, 450, 150, self)
         st_petersburg = City("St Petersburg", "blue", [], self.__window, 500, 100, self)
@@ -95,10 +96,10 @@ class Game:
         washington.set_connected_cities([montreal, new_york, miami, atlanta])
         new_york.set_connected_cities([london, madrid, washington, montreal])
         london.set_connected_cities([essen, paris, madrid, new_york])
-        essen.set_connected_cities([st_petersburg, milan, london])
+        essen.set_connected_cities([st_petersburg, milan, london, paris])
         st_petersburg.set_connected_cities([moscow, istanbul, essen])
         paris.set_connected_cities([essen, milan, algiers, madrid, london])
-        madrid.set_connected_cities([london, paris, sao_paulo, new_york])
+        madrid.set_connected_cities([london, paris, sao_paulo, new_york, algiers])
         milan.set_connected_cities([istanbul, paris, essen])
 
         los_angeles.set_connected_cities([san_francisco, chicago, mexico_city, sydney])
@@ -213,9 +214,6 @@ class Game:
         self.setup_game()
         return
 
-    def find_path(self, start_city, end_city, cards_to_use=[]):
-        #uses dijingstra to find path
-
     def get_cities(self):
         return self.__cities
 
@@ -310,6 +308,71 @@ class Game:
             if city.has_name(search_name):
                 return city
         return -1
+
+    def find_path(self, start_city, end_city, cards_to_use=[]):
+        #uses graph search to find path
+        start_node = PathNode(start_city, 0)
+        frontier = [start_node]
+        path_found = False
+        while not path_found:
+            current_node = frontier.pop(0)
+            cost = current_node.get_cost() + 1
+
+            #By moving
+            action = 'move'
+            for city in current_node.get_connected_cities():
+                to_add = PathNode(city, cost, current_node, action)
+                frontier.append(to_add)
+                if to_add.get_city().equals(end_city):
+                    path_found = True
+                    end_node = to_add
+                    break
+            if path_found:
+                break
+            #Shuttle flight
+            action = 'shuttle'
+            if current_node.has_research_station():
+                for city in self.__research_stations:
+                    to_add = PathNode(city, cost, current_node, action)
+                    frontier.append(to_add)
+                    if to_add.get_city().equals(end_city):
+                        path_found = True
+                        end_node = to_add
+                        break
+            if path_found:
+                break
+            #Charter_flight
+            action = 'charter'
+            for card in cards_to_use:
+                if card.has_name(current_node.get_name()) and not card.equals(current_node.get_used_card()):
+                    end_node = PathNode(end_city, cost, current_node, action, used_card=card)
+                    frontier.append(end_node)
+                    path_found = True
+                    break
+            if path_found:
+                break
+            action = 'direct'
+            #Direct Flight
+            for card in cards_to_use:
+                if not card.equals(current_node.get_used_card()):
+                    to_add = PathNode(card.get_city(), cost, current_node, action, used_card=card)
+                    frontier.append(to_add)
+                    if to_add.get_city().equals(end_city):
+                        path_found = True
+                        end_node = to_add
+                        break
+
+        #Generating path from end_node
+        finished_path = False
+        current_node = end_node
+        while not finished_path:
+            prev_node = current_node.get_previous_node()
+            prev_node.set_next_node(current_node)
+            prev_node.set_action_to_get_to_next(current_node.get_arriving_action())
+            current_node = prev_node
+            finished_path = current_node.get_city().equals(start_city)
+
+        return prev_node
 
     def is_cured(self, colour):
         return colour in self.__cured

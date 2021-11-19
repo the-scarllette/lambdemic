@@ -11,6 +11,11 @@ class Card:
     def discard(self):
         self.discarded = True
 
+    def equals(self, to_check):
+        if to_check is None:
+            return False
+        return self.has_name(to_check.get_name())
+
     def has_name(self, to_check):
         return to_check == self.name
 
