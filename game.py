@@ -8,11 +8,13 @@ from curetracker import CureTracker
 from random import randint, choice
 from deck import Deck
 from pathnode import PathNode
+from results.resultsmanager import ResultsManager
 
 
 class Game:
 
     def __init__(self, window, mode, agent, use_graphics, auto_run, print_results):
+        self.__player_count = 2
         self.__window = window
         self.__use_graphics = use_graphics
         if not self.__use_graphics and self.__window is not None:
@@ -211,6 +213,9 @@ class Game:
         self.colours = ["blue", "yellow", "black", "red"]
         self.__cure_trackers = [CureTracker(self.__window, self.colours[i], 20*(i+1), 10) for i in range(4)]
 
+        if self.__mode != "random":
+            self.__results_manager = ResultsManager(self.__player.get_results_filename())
+
         self.setup_game()
         return
 
@@ -391,7 +396,7 @@ class Game:
             self.random_turn()
             return
 
-        self.__player.act()
+        self.__results_manager.add_return(self.__player.act())
 
         return
 
@@ -448,7 +453,10 @@ class Game:
             print("Player takes turn")
             self.next_turn()
             print("Change game state")
-            self.player_draw_cards(self.__players[self.__current_turn])
+            if self.__mode == "random":
+                self.player_draw_cards(self.__players[self.__current_turn])
+            else:
+                self.player_draw_cards(self.__player)
             self.infect_cities()
             print("Player updatting state")
             self.__current_turn = (self.__current_turn + 1) % len(self.__players)
@@ -634,9 +642,16 @@ class Game:
                 print(city.get_name() + " has " + str(cubes_to_place) + " cubes")
 
         #Dealing cards to players
-        for player in self.__players:
-            for i in range(4):
-                player.add_to_hand(self.__player_deck.draw_and_discard())
+        if self.__mode == 'random':
+            for player in self.__players:
+                for i in range(4):
+                    player.add_to_hand(self.__player_deck.draw_and_discard())
+        else:
+            cards_to_add = []
+            for i in range(6 - self.__player_count):
+                cards_to_add.append(self.__player_deck.draw_and_discard())
+            self.__player.initial_hands(cards_to_add)
+
 
         #Shuffling in Epidemics
         self.__player_deck.add_epidemics(self.__epidemics)

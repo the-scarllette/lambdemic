@@ -44,6 +44,9 @@ class Player(GameObject):
     def get_name(self):
         return self.__name
 
+    def get_results_filename(self):
+        return self.__
+
     def set_city(self, city):
         self.__city = city
 
