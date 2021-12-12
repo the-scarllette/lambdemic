@@ -13,6 +13,8 @@ from results.resultsmanager import ResultsManager
 
 class Game:
 
+    colours = ["blue", "yellow", "black", "red"]
+
     def __init__(self, window, mode, agent, use_graphics, auto_run, print_results):
         self.__player_count = 2
         self.__window = window
@@ -210,7 +212,6 @@ class Game:
         self.__infection_deck.shuffle()
         self.__player_deck.shuffle()
 
-        self.colours = ["blue", "yellow", "black", "red"]
         self.__cure_trackers = [CureTracker(self.__window, self.colours[i], 20*(i+1), 10) for i in range(4)]
 
         if self.__mode != "random":
@@ -379,6 +380,12 @@ class Game:
 
         return prev_node
 
+    def get_city_by_name(self, name):
+        for city in self.__cities:
+            if city.has_name(name):
+                return city
+        return None
+
     def is_cured(self, colour):
         return colour in self.__cured
 
@@ -396,7 +403,7 @@ class Game:
             self.random_turn()
             return
 
-        self.__results_manager.add_return(self.__player.act())
+        self.__player.act()
 
         return
 
@@ -459,6 +466,7 @@ class Game:
                 self.player_draw_cards(self.__player)
             self.infect_cities()
             print("Player updatting state")
+            self.__results_manager.add_return(self.__player.observe_reward())
             self.__current_turn = (self.__current_turn + 1) % len(self.__players)
         return
 

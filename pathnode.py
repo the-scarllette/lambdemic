@@ -16,6 +16,7 @@ class PathNode:
         self.__used_card = used_card
         self.__next_node = None
         self.__action_to_get_to_next = None
+        return
 
     def get_arriving_action(self):
         return self.__action_to_arrive
@@ -40,6 +41,14 @@ class PathNode:
 
     def get_previous_node(self):
         return self.__previous_node
+
+    def get_total_cost(self):
+        current_node = self
+
+        while current_node.get_next_node() is not None:
+            current_node = current_node.get_next_node()
+
+        return current_node.get_cost()
 
     def get_used_card(self):
         return self.__used_card

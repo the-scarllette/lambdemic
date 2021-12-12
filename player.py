@@ -116,6 +116,10 @@ class Player(GameObject):
         self.x = self.__city.get_x()
         self.y = self.__city.get_y()
         self.draw()
+        return
+
+    def observe_reward(self):
+        return 0
 
     def remove_card_by_name(self, card_name):
         removed = False
