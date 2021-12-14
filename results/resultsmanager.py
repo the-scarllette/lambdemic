@@ -31,6 +31,10 @@ class ResultsManager:
         plt.show()
         return
 
+    def increment_turn_count(self):
+        self.__turn_count += 1
+        return
+
     def write_data(self):
         with open(self.__file_name, 'r') as json_file:
             data = json.load(json_file)

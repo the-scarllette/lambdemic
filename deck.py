@@ -28,10 +28,6 @@ class Deck(GameObject):
             self.__deck.insert(index, EpidemicCard())
             self.__cards_in_deck += 1
 
-        for i in range(self.__cards_in_deck):
-            if self.__deck[i].is_epidemic:
-                print("Epidemic at " + str(i))
-
     def discard_card(self, card):
         self.__discard_pile.append(card)
         return

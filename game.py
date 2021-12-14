@@ -214,10 +214,14 @@ class Game:
 
         self.__cure_trackers = [CureTracker(self.__window, self.colours[i], 20*(i+1), 10) for i in range(4)]
 
-        if self.__mode != "random":
+        if self.__mode != "random" and self.__player is not None:
             self.__results_manager = ResultsManager(self.__player.get_results_filename())
 
-        self.setup_game()
+        return
+
+    def add_player(self, player):
+        self.__player = player
+        self.__results_manager = ResultsManager(self.__player.get_results_filename())
         return
 
     def get_cities(self):
@@ -318,6 +322,8 @@ class Game:
     def find_path(self, start_city, end_city, cards_to_use=[]):
         #uses graph search to find path
         start_node = PathNode(start_city, 0)
+        if start_city.equals(end_city):
+            return start_node
         frontier = [start_node]
         path_found = False
         while not path_found:
@@ -389,14 +395,20 @@ class Game:
     def is_cured(self, colour):
         return colour in self.__cured
 
+    def get_research_stations(self):
+        return self.__research_stations
+
     def player_draw_cards(self, player):
         for i in range(2):
             card = self.__player_deck.draw_card()
+            if card is None:
+                return False
             if card.is_epidemic:
                 self.epidemic()
                 continue
             player.add_to_hand(card)
             player.draw()
+        return True
 
     def next_turn(self):
         if self.__mode == 'random':
@@ -450,6 +462,8 @@ class Game:
             self.run_game_auto()
         else:
             self.ran_game_manual()
+        self.__player.learn()
+        self.__results_manager.write_data()
 
         if self.__print_results:
             self.print_results()
@@ -457,15 +471,20 @@ class Game:
 
     def run_game_auto(self):
         while self.__game_running:
+            if self.__mode != 'random':
+                self.__results_manager.increment_turn_count()
             print("Player takes turn")
             self.next_turn()
             print("Change game state")
             if self.__mode == "random":
-                self.player_draw_cards(self.__players[self.__current_turn])
+                draw_result =self.player_draw_cards(self.__players[self.__current_turn])
             else:
-                self.player_draw_cards(self.__player)
+                draw_result = self.player_draw_cards(self.__player)
+                self.__player.discard_to_hand_limit()
             self.infect_cities()
-            print("Player updatting state")
+            if not draw_result:
+                self.end_game()
+            print("Player updating state")
             self.__results_manager.add_return(self.__player.observe_reward())
             self.__current_turn = (self.__current_turn + 1) % len(self.__players)
         return
@@ -647,7 +666,6 @@ class Game:
                 city = self.find_city_by_name(self.__infection_deck.draw_and_discard().get_name())
                 for j in range(cubes_to_place):
                     city.inc_cubes(city.get_colour())
-                print(city.get_name() + " has " + str(cubes_to_place) + " cubes")
 
         #Dealing cards to players
         if self.__mode == 'random':

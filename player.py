@@ -111,6 +111,9 @@ class Player(GameObject):
         start_y = 390
         return (start_x <= mouse_x) and (mouse_x <= start_x + 60) and (start_y <= mouse_y) and (mouse_y <= start_y + 20)
 
+    def learn(self):
+        return
+
     def move_to(self, new_city):
         self.__city = new_city
         self.x = self.__city.get_x()

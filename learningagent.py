@@ -1,3 +1,5 @@
+import random
+
 from player import Player
 
 class LearningAgent(Player):
@@ -22,8 +24,18 @@ class LearningAgent(Player):
         self.players[self.current_turn].add_to_hand(card)
         return
 
+    def discard_to_hand_limit(self):
+        for player in self.players:
+            hand = player.get_hand()
+            while len(hand) > 7:
+                to_discard = random.choice(hand)
+                player.discard_card_by_name(to_discard.get_name())
+                hand = player.get_hand()
+        return
+
     def draw(self):
-        self.players[self.player_count].draw()
+        for player in self.players:
+            player.draw()
         return
 
     def get_results_filename(self):
@@ -33,3 +45,6 @@ class LearningAgent(Player):
         for i in range(len(cards_to_add)):
             self.players[i % self.player_count].add_to_hand(cards_to_add[i])
         return
+
+    def observe_reward(self):
+        return 0

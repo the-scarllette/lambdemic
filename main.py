@@ -1,29 +1,34 @@
 from game import Game
 from graphics import *
-from pathnode import PathNode
-from citycard import CityCard
 from qlearning.qlearningagent import QLearningAgent
-from results.resultsmanager import ResultsManager
 
+# Initalising Window
 width = 1000
-hight = 600
-
+height = 600
 use_graphics = False
 
 window = None
 if use_graphics:
-    window = GraphWin("Pandemicai", width, hight)
+    window = GraphWin("Pandemicai", width, height)
 
-agent = None
+num_runs = 20
 
-game = Game(window, 'random', agent, use_graphics, True, True)
 
-agent = QLearningAgent(game, 2, window, game.get_city_by_name("Atlanta"))
+for i in range(num_runs):
+    # Creating Game
+    game = Game(window, 'qlearning', None, use_graphics, True, True)
 
-agent.initialise_q_values()
+    # Creating Agent
+    initialise = False
+    if i == 0:
+        initialise = True
+    agent = QLearningAgent(game, 2, window, game.get_city_by_name("Atlanta"), initialise)
+    game.add_player(agent)
 
-if use_graphics:
-    game.draw_game()
+    game.setup_game()
 
-#game.run_game()
+    if use_graphics:
+        game.draw_game()
 
+    # Running Game
+    game.run_game()
