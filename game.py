@@ -194,8 +194,8 @@ class Game:
                          tokyo,
                          seoul]
 
+        self.__research_stations = []
         atlanta.set_has_res_station(True)
-        self.__research_stations = [city for city in self.__cities if city.has_research_station()]
 
         self.__player_1 = Player("player 1", self.__window, atlanta, "orange", 0)
         self.__player_2 = Player("player 2", self.__window, atlanta, "green", 5)
@@ -222,6 +222,14 @@ class Game:
     def add_player(self, player):
         self.__player = player
         self.__results_manager = ResultsManager(self.__player.get_results_filename())
+        return
+
+    def add_res_station(self, city_to_add):
+        self.__research_stations.append(city_to_add)
+        return
+
+    def remove_res_station(self, city_to_remove):
+        self.__research_stations.remove(city_to_remove)
         return
 
     def get_cities(self):
@@ -392,6 +400,10 @@ class Game:
                 return city
         return None
 
+    def graph_results(self):
+        self.__results_manager.graph_results()
+        return
+
     def is_cured(self, colour):
         return colour in self.__cured
 
@@ -463,7 +475,17 @@ class Game:
         else:
             self.ran_game_manual()
         self.__player.learn()
-        self.__results_manager.write_data()
+
+        infected_cities = 0
+        for city in self.__cities:
+            for colour in Game.colours:
+                if city.get_cubes(colour) > 0:
+                    infected_cities += 1
+        cured_diseases = 0
+        for colour in Game.colours:
+            if self.is_cured(colour):
+                cured_diseases += 1
+        self.__results_manager.write_data(infected_cities, cured_diseases)
 
         if self.__print_results:
             self.print_results()
@@ -529,6 +551,10 @@ class Game:
         for tracker in self.__cure_trackers:
             if tracker.get_colour() == colour:
                 return tracker.is_cured()
+
+    def print_cured_data(self):
+        self.__results_manager.get_cured_data()
+        return
 
     def random_turn(self):
         print("Making random moves")
@@ -674,11 +700,23 @@ class Game:
                     player.add_to_hand(self.__player_deck.draw_and_discard())
         else:
             cards_to_add = []
-            for i in range(6 - self.__player_count):
+            for i in range((6 - self.__player_count)*self.__player_count):
                 cards_to_add.append(self.__player_deck.draw_and_discard())
             self.__player.initial_hands(cards_to_add)
 
 
         #Shuffling in Epidemics
         self.__player_deck.add_epidemics(self.__epidemics)
+
+        # Telling agent to update interal state
+        if self.__mode != 'random':
+            self.__player.update_state()
+        return
+
+    def treat_disease(self, city, colour):
+        if self.is_cured(colour):
+            city.set_cubes(colour, 0)
+            return
+
+        city.dec_cubes(colour)
         return

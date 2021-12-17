@@ -59,6 +59,10 @@ class City(GameObject):
     def set_connected_cities(self, to_set):
         self.__connected_cities = to_set.copy()
 
+    def set_cubes(self, colour, to_set):
+        self.__cubes[colour] = to_set
+        return
+
     def set_left_city(self, to_set):
         self.__left_city = to_set
 
@@ -69,6 +73,10 @@ class City(GameObject):
         self.__has_outbreaked = to_set
 
     def set_has_res_station(self, to_set):
+        if to_set:
+            self.__game.add_res_station(self)
+        else:
+            self.__game.remove_res_station(self)
         self.__has_res_station = to_set
 
     def click(self):

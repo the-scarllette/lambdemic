@@ -21,9 +21,9 @@ import json
             Moves to closest card location
             Builds research station there if there isn't already one
         give
-            If other player is in city of matching card
-            moves to closest player that matches criteia
-            gives card
+            Out of the cards in hand and other players,
+            moves to the city that it has a card of and is closets to another player
+            If it can, then gives the card
         take
             If player has card of the city they are in
             Moves to the closest player that matches this cretieria
@@ -46,13 +46,13 @@ class QLearningAgent(LearningAgent):
     possible_actions_str = ["treat", "build", "give", "take", "cure"]
 
     # Learning Rate
-    alpha = 0.9
+    alpha = 0.8
 
     # Epsilon in epsilon-greedy function
-    epsilon = 0.2
+    epsilon = 0.1
 
     # Discounting Factor
-    gamma = 0.5
+    gamma = 0.9
 
     def __init__(self, game, player_count, window, start_city, initialise):
         super(QLearningAgent, self).__init__(game, QLearningAgent.learning_file, QLearningAgent.results_file,
@@ -76,13 +76,18 @@ class QLearningAgent(LearningAgent):
         action_taken = False
         unavailable_actions = []
 
+        # Using epsilon-greedy to determine if to take a random action
+        random_action = False
+        x = random.randint(1, 100)
+        if x <= self.epsilon * 100:  # Take a random action
+            random_action = True
+        # If not takes action that maximises reward
+
         while not action_taken:
-            # Using epsilon-greedy to determine if to take a random action
-            x = random.randint(1, 100)
-            if x <= self.epsilon*100:  # Take a random action
+            if random_action:
                 action = random.choice(self.possible_actions_str)
-            else:  # Take action that maximises reward
-                action = self.choose_optimal_action(self.current_state)
+            else:
+                action = self.choose_optimal_action(self.current_state, unavailable_actions)
 
             unavailable_actions.append(action)
 
@@ -96,7 +101,7 @@ class QLearningAgent(LearningAgent):
 
     def build(self, acting_player):
         # Finds closest city based on cards in hand
-        hand = acting_player.get_hand()
+        hand = acting_player.get_hand().copy()
         path_node = None
         min_path_cost = 1000
 
@@ -127,12 +132,12 @@ class QLearningAgent(LearningAgent):
         current_city.set_has_res_station(True)
         return True
 
-    def choose_optimal_action(self, current_state):
+    def choose_optimal_action(self, current_state, unavailable_actions):
         best_action = QLearningAgent.possible_actions_str[0]
-        best_q_value = -1
+        best_q_value = -1000000
 
         for action_value in self.q_values[current_state]:
-            if action_value["value"] > best_q_value:
+            if action_value["value"] > best_q_value and action_value["action"] not in unavailable_actions:
                 best_action = action_value["action"]
                 best_q_value = action_value["value"]
 
@@ -228,48 +233,42 @@ class QLearningAgent(LearningAgent):
         return infected_cites + can_cure_str + cured_str
 
     def give(self, acting_player):
-        # Determines if other players are in a city that the current player has
+        # Finding cards that are closests to players
         hand = acting_player.get_hand().copy()
         potential_players = []
-        cards_to_use = []
+        potential_cards = []
+        min_cost = 1000
         for card in hand:
             for player in self.players:
                 if player.has_name(acting_player.get_name()):
                     continue
-                if player.get_city() == card.get_name():
+                node = self.game.find_path(player.get_city(), card.get_city(), player.get_hand())
+                cost = node.get_total_cost()
+                if cost < min_cost:
+                    min_cost = cost
+                    potential_cards = [card]
+                    potential_players = [player]
+                elif cost == min_cost:
                     potential_players.append(player)
-                    cards_to_use.append(card)
-        if len(potential_players) <= 0:
+                    potential_cards.append(card)
+        n = len(potential_players)
+        if n <= 0:
             return False
 
-        # Finding closest potential recieving player
-        start_node = None
-        min_cost = 1000
-        give_to_player = None
-        card_to_use = None
-        for i in range(len(potential_players)):
-            recieving_player = potential_players[i]
-            card = cards_to_use[i]
-            hand.remove(card)
-            node = self.game.find_path(acting_player.get_city(), recieving_player.get_city(), hand)
-            hand.append(card)
-            cost = node.get_total_cost()
-            if cost < min_cost:
-                min_cost = cost
-                start_node = node
-                give_to_player = recieving_player
-                card_to_use = card
+        index = random.randint(0, n - 1)
+        receiving_player = potential_players[index]
+        card_to_give = potential_cards[index]
+        target_city = card_to_give.get_city()
 
-        if start_node is None:
-            return False
-
-        # Move to player
+        # Moving to city
+        hand.remove(card_to_give)
+        start_node = self.game.find_path(acting_player.get_city(), target_city, hand)
         action_points = self.move_player(acting_player, start_node, 4)
 
-        # Give card if can
-        if action_points > 0:
-            acting_player.discard_card_by_name(card_to_use.get_name())
-            give_to_player.add_to_hand(card_to_use)
+        # Giving card, if can
+        if action_points > 0 and acting_player.get_city().equals(target_city) and receiving_player.get_city().equals(target_city):
+            acting_player.discard_card_by_name(card_to_give.get_name())
+            receiving_player.add_to_hand(card_to_give)
 
         return True
 
@@ -320,11 +319,16 @@ class QLearningAgent(LearningAgent):
 
     def observe_reward(self):
         next_state = self.get_state_code()
-        r = 1
-        for colour in Game.colours:
-            if not self.game.is_cured(colour):
-                r = 0
-                break
+
+        # Getting Reward
+        total_cities = len(self.game.get_cities())
+        reward = -1*int(next_state[0:2])
+        for num in next_state[2:6]:
+            if num == "1":
+                reward += total_cities
+        for num in next_state[6:10]:
+            if num == "1":
+                reward += (total_cities*total_cities)
 
         max_action_value = -1
         for action_value in self.q_values[next_state]:
@@ -335,7 +339,7 @@ class QLearningAgent(LearningAgent):
         for action_value in self.q_values[self.current_state]:
             if action_value["action"] == self.last_action:
                 current_value = action_value["value"]
-                action_value["value"] = current_value + self.alpha*(r + self.gamma*max_action_value - current_value)
+                action_value["value"] = current_value + self.alpha*(reward + self.gamma*max_action_value - current_value)
                 q_value = action_value["value"]
                 break
 
@@ -426,7 +430,11 @@ class QLearningAgent(LearningAgent):
                     max_cubes = cubes
             if cure_colour is None:
                 return True
-            chosen_city.dec_cubes(cure_colour)
+            self.game.treat_disease(chosen_city, cure_colour)
             action_points -= 1
 
         return True
+
+    def update_state(self):
+        self.current_state = self.get_state_code()
+        return

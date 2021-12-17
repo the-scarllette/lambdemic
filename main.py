@@ -11,17 +11,14 @@ window = None
 if use_graphics:
     window = GraphWin("Pandemicai", width, height)
 
-num_runs = 20
+num_runs = 2000
+initialise = False
 
-
-for i in range(num_runs):
+for i in range(0):
     # Creating Game
     game = Game(window, 'qlearning', None, use_graphics, True, True)
 
     # Creating Agent
-    initialise = False
-    if i == 0:
-        initialise = True
     agent = QLearningAgent(game, 2, window, game.get_city_by_name("Atlanta"), initialise)
     game.add_player(agent)
 
@@ -32,3 +29,12 @@ for i in range(num_runs):
 
     # Running Game
     game.run_game()
+
+game = Game(window, 'qlearning', None, use_graphics, True, True)
+agent = QLearningAgent(game, 2, window, game.get_city_by_name("Atlanta"), initialise)
+game.add_player(agent)
+
+game.setup_game()
+#game.graph_results()
+
+game.print_cured_data()
