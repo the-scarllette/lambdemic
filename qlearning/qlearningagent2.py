@@ -1,12 +1,14 @@
 from learningagent import LearningAgent
 from game import Game
-from generalfunctions import decimal_to_binary
+from generalfunctions import *
 import random
 import json
 
-'''Data stored on environment:
-        How many cities infected
-        Do we have enough cards to cure
+'''
+    Data stored on environment:
+        How many cubes on board
+        How many cards of each colour needed to cure a disease
+        Research Station on board
         Cured diseases
 
     Rewards:
@@ -15,13 +17,10 @@ import json
         +For game win
 
     States encoded as:
-        {BlueCubes}{YellowCubes}{BlackCubes}{RedCubes}
+        {Number of cubes on the board}
         {Cards_to_cureBlue}{Cards_to_cureYellow}{Cards_to_cureBlack}{Cards_to_cureRed}
-        {0/1CuredBlue}{{0/1CuredYellow}{0/1CuredBlack}
-        {#Research_stations_on_board}
-        
-        {0/1CureBlue}{0/1CureYellow}{0/1CureBlack}{01/CureRed
-        {0/1CuredBlue}{{0/1CuredYellow}{0/1CuredBlack}{01/CuredRed}} 
+        {Research_stations_on_board}
+        {0/1CureBlue}{0/1CureYellow}{0/1CureBlack}{01/CuredRed}
 
     Possible Actions:
         treat
@@ -43,9 +42,9 @@ import json
             moves to research station and cures
 
     State-action space size:
-        states: 48x16x16 = 12,288
+        (theoretical maximum) )states: 96 x 5^4 x 5 x 2^4 = 4,800,000
         actions: 5
-        state action space : 61,440
+        state action space : 24,000,000
 '''
 
 
@@ -59,14 +58,14 @@ class QLearningAgent2(LearningAgent):
     alpha = 0.8
 
     # Epsilon in epsilon-greedy function
-    epsilon = 0.1
+    epsilon = 0.2
 
     # Discounting Factor
     gamma = 0.9
 
     def __init__(self, game, player_count, window, start_city, initialise):
         super(QLearningAgent2, self).__init__(game, QLearningAgent2.learning_file, QLearningAgent2.results_file,
-                                             player_count, window, start_city)
+                                              player_count, window, start_city)
 
         if initialise:
             self.initialise_q_values()
@@ -110,7 +109,11 @@ class QLearningAgent2(LearningAgent):
         return
 
     def build(self, acting_player):
-        # Finds closest city based on cards in hand
+        # Checks if 6 research stations are on board, if there are does not build
+        if len(self.game.get_research_stations()) >= 6:
+            return False
+
+        # Finds the closest city based on cards in hand
         hand = acting_player.get_hand().copy()
         path_node = None
         min_path_cost = 1000
@@ -143,7 +146,7 @@ class QLearningAgent2(LearningAgent):
         return True
 
     def choose_optimal_action(self, current_state, unavailable_actions):
-        best_action = QLearningAgent.possible_actions_str[0]
+        best_action = QLearningAgent2.possible_actions_str[0]
         best_q_value = -1000000
 
         for action_value in self.q_values[current_state]:
@@ -180,7 +183,7 @@ class QLearningAgent2(LearningAgent):
             if cards_removed >= 5:
                 break
 
-        # Finding path to nearest research station
+        # Finding path to the nearest research station
         res_station_cities = self.game.get_research_stations()
         min_cost = 1000
         start_node = None
@@ -206,31 +209,35 @@ class QLearningAgent2(LearningAgent):
         return True
 
     def get_state_code(self):
-        # Getting number of infected cities
-        infected_cites = 0
+        # Getting number of cubes on board
+        cubes = 0
         for city in self.game.get_cities():
             for colour in Game.colours:
-                if city.get_cubes(colour) > 0:
-                    infected_cites += 1
-                    break
-        infected_cites = str(infected_cites)
-        if len(infected_cites) < 2:
-            infected_cites = "0" + infected_cites
+                cubes += city.get_cubes(colour)
+        cube_str = str(cubes)
+        if cubes < 10:
+            cube_str = "0" + cube_str
 
-        # Getting If we can cure each disease
-        can_cure = {"blue": 0, "yellow": 0, "black": 0, "red": 0}
+        # Getting how many more cards of each colour needed to cure each disease
+        cards_needed = {"blue": 5, "yellow": 5, "black": 5, "red": 5}
         for player in self.players:
-            hand = player.get_hand()
             for colour in Game.colours:
-                count = 0
+                min_cards_needed = cards_needed[colour]
+                player_cards_needed = 5
+                hand = player.get_hand()
                 for card in hand:
                     if card.get_colour() == colour:
-                        count += 1
-                if count >= 5:
-                    can_cure[colour] = 1
-        can_cure_str = ""
-        for key in can_cure:
-            can_cure_str += str(can_cure[key])
+                        player_cards_needed -= 1
+                    if player_cards_needed <= 0:
+                        break
+                if player_cards_needed < min_cards_needed:
+                    cards_needed[colour] = player_cards_needed
+        cards_needed_str = ""
+        for key in cards_needed:
+            cards_needed_str += str(cards_needed[key])
+
+        # Getting number of research stations on board
+        research_stations = str(len(self.game.get_research_stations()))
 
         # Getting if disease is cured
         cured_str = ""
@@ -240,7 +247,7 @@ class QLearningAgent2(LearningAgent):
                 cured = "1"
             cured_str += cured
 
-        return infected_cites + can_cure_str + cured_str
+        return cube_str + cards_needed_str + research_stations + cured_str
 
     def give(self, acting_player):
         # Finding cards that are closests to players
@@ -285,24 +292,31 @@ class QLearningAgent2(LearningAgent):
 
     def initialise_q_values(self):
         data = {}
-        for i in range(len(self.game.get_cities())):
-            # Number of infected cities
-            num_cities = str(i)
-            if len(num_cities) <= 1:
-                num_cities = "0" + num_cities
 
-            # Can cure a disease and disease cured
-            for j in range(2556):
-                cured_num = decimal_to_binary(j)
-                while len(cured_num) < 8:
-                    cured_num = "0" + cured_num
+        for i in range(4*24 + 1):
+            # Number of cubes on the board
+            num_cubes = str(i)
+            num_cubes = elongate_str(num_cubes, "0", 2)
 
-                # Possible Actions
-                # Add possible actions
-                state = num_cities + cured_num
-                data[state] = []
-                for action in QLearningAgent.possible_actions_str:
-                    data[state].append({"action": action, "value": 0})
+            # Number of cards needed to cure each disease
+            for j in range(6*6*6*6):
+                num_cards = decimal_to_new_base(j, 6)
+                num_cards = elongate_str(num_cards, "0", 4)
+
+                # Number of research stations
+                for k in range(1, 7):
+                    research_stations = str(k)
+
+                    # Disease Cured
+                    for l in range(2*2*2*2):
+                        num_cured = decimal_to_new_base(l, 2)
+                        num_cured = elongate_str(num_cured, "0", 4)
+
+                        # Possible actions
+                        state = num_cubes + num_cards + research_stations + num_cured
+                        data[state] = []
+                        for action in QLearningAgent2.possible_actions_str:
+                            data[state].append({"action": action, "value": 0})
 
         with open(self.learning_file, 'w') as learning_file:
             json.dump(data, learning_file)
@@ -331,16 +345,20 @@ class QLearningAgent2(LearningAgent):
     def observe_reward(self):
         next_state = self.get_state_code()
 
-        # Getting Reward
-        total_cities = len(self.game.get_cities())
-        reward = -1 * int(next_state[0:2])
-        for num in next_state[2:6]:
-            if num == "1":
-                reward += total_cities
-        for num in next_state[6:10]:
-            if num == "1":
-                reward += (total_cities * total_cities)
+        cured_reward = 2
+        win_reward = 10
 
+        # Getting reward
+        reward = 0
+        # Has cured each disease
+        for i in range(7, 11):
+            if self.current_state[i] == "0" and next_state[i] == "1":
+                reward += cured_reward
+        # Game Won
+        if self.game.all_cured():
+            reward += win_reward
+
+        # Q-learning step
         max_action_value = -1
         for action_value in self.q_values[next_state]:
             value = action_value["value"]
@@ -351,7 +369,7 @@ class QLearningAgent2(LearningAgent):
             if action_value["action"] == self.last_action:
                 current_value = action_value["value"]
                 action_value["value"] = current_value + self.alpha * (
-                            reward + self.gamma * max_action_value - current_value)
+                        reward + self.gamma * max_action_value - current_value)
                 q_value = action_value["value"]
                 break
 
@@ -359,6 +377,12 @@ class QLearningAgent2(LearningAgent):
         self.current_state = next_state
 
         return q_value
+
+    def q_learner_reset(self, new_game, new_window, new_start_city):
+        self.reset_game(new_game, new_window, new_start_city)
+        self.current_state = self.get_state_code()
+        self.last_action = None
+        return
 
     def take(self, acting_player):
         # Determines if a player is in a city that they have a card for

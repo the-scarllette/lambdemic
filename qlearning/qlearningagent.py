@@ -8,11 +8,11 @@ import json
         How many cities infected
         Do we have enough cards to cure
         Cured diseases
-    
+
     States encoded as:
         {NUMCITES}{0/1CureBlue}{0/1CureYellow}{0/1CureBlack}{01/CureRed
         {0/1CuredBlue}{{0/1CuredYellow}{0/1CuredBlack}{01/CuredRed}} 
-    
+
     Possible Actions:
         treat
             Moves to closest city with disease cubes
@@ -31,7 +31,7 @@ import json
         cure
             If have enough cards to cure an uncured disease
             moves to research station and cures
-    
+
     State-action space size:
         states: 48x16x16 = 12,288
         actions: 5
@@ -266,7 +266,8 @@ class QLearningAgent(LearningAgent):
         action_points = self.move_player(acting_player, start_node, 4)
 
         # Giving card, if can
-        if action_points > 0 and acting_player.get_city().equals(target_city) and receiving_player.get_city().equals(target_city):
+        if action_points > 0 and acting_player.get_city().equals(target_city) and receiving_player.get_city().equals(
+                target_city):
             acting_player.discard_card_by_name(card_to_give.get_name())
             receiving_player.add_to_hand(card_to_give)
 
@@ -322,13 +323,13 @@ class QLearningAgent(LearningAgent):
 
         # Getting Reward
         total_cities = len(self.game.get_cities())
-        reward = -1*int(next_state[0:2])
+        reward = -1 * int(next_state[0:2])
         for num in next_state[2:6]:
             if num == "1":
                 reward += total_cities
         for num in next_state[6:10]:
             if num == "1":
-                reward += (total_cities*total_cities)
+                reward += (total_cities * total_cities)
 
         max_action_value = -1
         for action_value in self.q_values[next_state]:
@@ -339,7 +340,8 @@ class QLearningAgent(LearningAgent):
         for action_value in self.q_values[self.current_state]:
             if action_value["action"] == self.last_action:
                 current_value = action_value["value"]
-                action_value["value"] = current_value + self.alpha*(reward + self.gamma*max_action_value - current_value)
+                action_value["value"] = current_value + self.alpha * (
+                            reward + self.gamma * max_action_value - current_value)
                 q_value = action_value["value"]
                 break
 
@@ -347,6 +349,12 @@ class QLearningAgent(LearningAgent):
         self.current_state = next_state
 
         return q_value
+
+    def q_learner_reset(self, new_game, new_window, new_start_city):
+        self.reset_game(new_game, new_window, new_start_city)
+        self.current_state = self.get_state_code()
+        self.last_action = None
+        return
 
     def take(self, acting_player):
         # Determines if a player is in a city that they have a card for
