@@ -16,8 +16,7 @@ This can be ran with or without graphics in order to train learning agents.
 Currently, pandemicai uses *Q-learning* to play Pandemic.
 
 ## Roadmap
-The next step in pandemic is update the current Q-learning agent to add more detail into it's state representation,
-and to refine the state-transition rewards.<br>
+The next iteration of the project is a TD(Lambda) agent.
 
 However, the future plan is to use *function-approximation methods* to create better agents,
 namely adding a TD Gamma agent.
