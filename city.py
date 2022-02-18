@@ -136,9 +136,7 @@ class City(GameObject):
                 for city in self.__connected_cities:
                     city.inc_cubes(colour)
         else:
-            cube_added = self.__game.inc_cubes(colour)
-            if cube_added:
-                self.__cubes[colour] += 1
+            self.__cubes[colour] += 1
 
         self.__cube_text[colour].setText(str(self.__cubes[colour]))
         self.draw_cubes()

@@ -48,13 +48,3 @@ class LearningAgent(Player):
 
     def observe_reward(self):
         return 0
-
-    def reset_game(self, new_game, new_window, new_start_city):
-        self.game = new_game
-        self.window = new_window
-        self.players = []
-        for i in range(self.player_count):
-            self.players.append(Player("Player " + str(i), self.window, new_start_city,
-                                       LearningAgent.player_colours[i], i*5))
-        self.current_turn = 0
-        return
