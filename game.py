@@ -15,7 +15,7 @@ class Game:
 
     colours = ["blue", "yellow", "black", "red"]
 
-    def __init__(self, window, mode, agent, use_graphics, auto_run, print_results, teach_agent):
+    def __init__(self, window, mode, agent, use_graphics, auto_run, print_results):
         self.__player_count = 2
         self.__window = window
         self.__use_graphics = use_graphics
@@ -34,8 +34,6 @@ class Game:
         self.__infection_rate_index = 0
         self.__infection_rate = self.__infection_rate_track[self.__infection_rate_index]
         self.__epidemic_count = 0
-
-        self.__cubes = {"blue": 0, "yellow": 0, "black": 0, "red": 0}
 
         atlanta = City("Atlanta", "blue", [], self.__window, 150, 200, self)
         san_francisco = City("San Francisco", "blue", [], self.__window, 50, 150, self)
@@ -219,8 +217,6 @@ class Game:
         if self.__mode != "random" and self.__player is not None:
             self.__results_manager = ResultsManager(self.__player.get_results_filename())
 
-        self.__teach_agent = teach_agent
-
         return
 
     def add_player(self, player):
@@ -251,18 +247,10 @@ class Game:
         print("No matching card found in deck")
 
     def cure_disease(self, colour):
-        cured = 0
         for tracker in self.__cure_trackers:
             if tracker.get_colour() == colour:
                 tracker.set_cured(True)
-            if tracker.is_cured():
-                cured += 1
-
-        # Ends game if all diseases cured
-        if cured >= 4:
-            self.end_game()
-
-        return
+                return
 
     def discard_card_from_player(self, player):
         card_name = input("Enter the card to discard from the hand of " + player.get_name() + ":\n")
@@ -479,43 +467,14 @@ class Game:
         print("Outbreak track at " + str(self.__outbreak_tracker.get_outbreaks()))
         return
 
-    def is_running(self):
-        return self.__game_running
-
-    def all_cured(self):
-        for tracker in self.__cure_trackers:
-            if not tracker.is_cured():
-                return False
-        return True
-
-    def is_lost(self):
-        if not self.__game_running:
-            return False
-
-        for tracker in self.__cure_trackers:
-            if not tracker.is_cured():
-                return True
-        return False
-
-    def is_won(self):
-        if not self.__game_running:
-            return False
-
-        for tracker in self.__cure_trackers:
-            if not tracker.is_cured():
-                return False
-        return True
-
     def run_game(self):
         self.__game_running = True
 
         if self.__auto_run:
             self.run_game_auto()
         else:
-            self.run_game_manual()
-
-        if self.__teach_agent:
-            self.__player.learn()
+            self.ran_game_manual()
+        self.__player.learn()
 
         infected_cities = 0
         for city in self.__cities:
@@ -576,13 +535,6 @@ class Game:
                 self.infect_cities()
                 self.__current_turn = (self.__current_turn + 1) % len(self.__players)
         return
-
-    def inc_cubes(self, colour):
-        if self.__cubes[colour] >= 24:
-            self.end_game()
-            return False
-        self.__cubes[colour] += 1
-        return True
 
     def inc_outbreaks(self):
         self.__outbreak_tracker.inc_outbreaks()
@@ -756,7 +708,7 @@ class Game:
         #Shuffling in Epidemics
         self.__player_deck.add_epidemics(self.__epidemics)
 
-        # Telling agent to update internal state
+        # Telling agent to update interal state
         if self.__mode != 'random':
             self.__player.update_state()
         return
