@@ -55,7 +55,8 @@ class NeuralNet:
         for i in range(self.__columns - 1):
             for j in range(self.__rows):
                 print("Node " + str(i) + ", " + str(j) + " weights: " + str(self.__weights[i][j]))
-        print("Node " + str(self.__columns - 1) + ", " + str(0) + " weights: " + str(self.__weights[i][0]))
+        print("Node " + str(self.__columns - 1) + ", " + str(0) + " weights: "
+              + str(self.__weights[self.__columns - 1][0]))
         return
 
     def set_node_weights(self, i, j, new_weights):
