@@ -2,7 +2,8 @@ from game import Game
 from graphics import *
 from qlearning.qlearningagent import QLearningAgent
 from results.resultsmanager import ResultsManager
-
+from neuralnet.neuralnet import NeuralNet
+'''
 # Initialising Window
 width = 1000
 height = 600
@@ -41,3 +42,10 @@ for i in range(num_runs):
     game.run_game()
 
 game.graph_results()
+'''
+
+net = NeuralNet(3, 2)
+net.print_weights()
+x = [1, 1]
+result = net.compute_net(x)
+print("Computed result: " + str(result))
