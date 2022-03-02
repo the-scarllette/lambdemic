@@ -44,8 +44,14 @@ for i in range(num_runs):
 game.graph_results()
 '''
 
-net = NeuralNet(3, 2)
+cols = 4
+inputs = 19
+net = NeuralNet(columns=cols, rows=inputs)
 net.print_weights()
-x = [1, 1]
-result = net.compute_net(x)
-print("Computed result: " + str(result))
+print("saving file")
+net.save_net('test_net.json')
+new_net = NeuralNet(net_filename='test_net.json')
+print("new net file")
+new_net.print_weights()
+
+print("Nets are equal true/false: " + str(new_net.equals(net)))

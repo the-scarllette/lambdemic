@@ -1,6 +1,6 @@
 import random
-
 from player import Player
+
 
 class LearningAgent(Player):
 
