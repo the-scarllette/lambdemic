@@ -44,14 +44,13 @@ for i in range(num_runs):
 game.graph_results()
 '''
 
-cols = 4
-inputs = 19
-net = NeuralNet(columns=cols, rows=inputs)
-net.print_weights()
-print("saving file")
-net.save_net('test_net.json')
-new_net = NeuralNet(net_filename='test_net.json')
-print("new net file")
-new_net.print_weights()
-
-print("Nets are equal true/false: " + str(new_net.equals(net)))
+cols = 3
+inputs = 2
+net = NeuralNet(columns=cols, rows=inputs, net_filename='test_net.json')
+x = [1 for i in range(inputs)]
+y_reg = net.compute_net(x)
+print("Regular computing: " + str(y_reg))
+y_rec = net.compute_net_recursive(x)
+print("Recursive computing: " + str(y_rec))
+print("Are equal true/false: " + str(y_reg == y_rec))
+print("Derivative: " + str(net.gradient(x, 1, 1)))

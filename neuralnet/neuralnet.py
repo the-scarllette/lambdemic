@@ -28,15 +28,16 @@ class NeuralNet:
         self.__nodes = [[] for i in range(self.__columns)]
 
         # Building network
-        for i in range(self.__columns-1):
+        for i in range(self.__columns - 1):
             input_node = i == 0
             last_nodes = None
             if not input_node:
                 last_nodes = self.__nodes[i - 1]
             for j in range(self.__rows):
-                node = NeuralNode(self.__weights[i][j], last_nodes, input_node)
+                node = NeuralNode(self.__weights[i][j], i, j, last_nodes, input_node)
                 self.__nodes[i].append(node)
-        self.__output_node = NeuralNode(self.__weights[self.__columns-1][0], last_nodes, False)
+        self.__output_node = NeuralNode(self.__weights[self.__columns - 1][0], self.__columns-1, 0,
+                                        self.__nodes[self.__columns - 2], False)
         self.__nodes[self.__columns-1].append(self.__output_node)
         return
 
@@ -49,6 +50,9 @@ class NeuralNet:
 
         return self.__output_node.compute(result)
 
+    def compute_net_recursive(self, x):
+        return self.__output_node.compute_recursive(x)
+
     def equals(self, other_net):
         other_cols, other_rows = other_net.get_size()
         if not (self.__rows == other_rows and self.__columns == other_cols):
@@ -58,7 +62,11 @@ class NeuralNet:
             for j in range(self.__rows):
                 if not self.__weights[i][j] == other_weights[i][j]:
                     return False
-        return self.__weights[self.__columns - 1][0] == other_weights[self.__columns -1][0]
+        return self.__weights[self.__columns - 1][0] == other_weights[self.__columns - 1][0]
+    
+    # Finds the gradient of the neural net at the value x by the weight vector for the i, j node
+    def gradient(self, x, i, j):
+        return [self.__output_node.derivative(x, i, j, k) for k in range(len(self.__weights[i][j]))]
 
     def generate_weights(self):
         self.__weights = [[[] for j in range(self.__rows)] for i in range(self.__columns - 1)]
