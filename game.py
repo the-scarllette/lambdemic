@@ -506,6 +506,31 @@ class Game:
                 return False
         return True
 
+    def train_td_lambda(self):
+        self.__game_running = True
+
+        while self.__game_running:
+            # Agent takes Action
+            self.__player.act()
+            # Partially transitions to next game stat
+
+            # Checks if player has one
+            self.__game_running = not self.all_cured()
+
+            # Fully transitions to next game state
+            if self.__game_running:
+                # Player is given cards
+                self.__game_running = self.player_draw_cards(self.__player)
+                self.__player.discard_to_hand_limit()
+
+                # Cities infected
+                self.infect_cities()
+
+            # Player observes reward and updates neural net, returning reward received
+            self.__results_manager.add_return(self.__player.update_neural_net())
+            self.__current_turn = (self.__current_turn + 1) % len(self.__players)
+        return
+
     def run_game(self):
         self.__game_running = True
 
@@ -536,18 +561,21 @@ class Game:
         while self.__game_running:
             if self.__mode != 'random':
                 self.__results_manager.increment_turn_count()
-            print("Player takes turn")
+
+            # Player takes an action
             self.next_turn()
-            print("Change game state")
+
+            # Game state is updated
             if self.__mode == "random":
-                draw_result =self.player_draw_cards(self.__players[self.__current_turn])
+                draw_result = self.player_draw_cards(self.__players[self.__current_turn])
             else:
                 draw_result = self.player_draw_cards(self.__player)
                 self.__player.discard_to_hand_limit()
             self.infect_cities()
             if not draw_result:
                 self.end_game()
-            print("Player updating state")
+
+            # Player observes reward and transitions to next state
             self.__results_manager.add_return(self.__player.observe_reward())
             self.__current_turn = (self.__current_turn + 1) % len(self.__players)
         return

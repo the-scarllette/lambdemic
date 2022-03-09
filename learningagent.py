@@ -15,6 +15,8 @@ class LearningAgent(Player):
         for i in range(self.player_count):
             self.players.append(Player("Player " + str(i), window, start_city, LearningAgent.player_colours[i], i*5))
         self.current_turn = 0
+        
+        self.current_state = {}
         return
 
     def act(self):
@@ -46,9 +48,6 @@ class LearningAgent(Player):
             self.players[i % self.player_count].add_to_hand(cards_to_add[i])
         return
 
-    def observe_reward(self):
-        return 0
-
     def reset_game(self, new_game, new_window, new_start_city):
         self.game = new_game
         self.window = new_window
@@ -57,4 +56,7 @@ class LearningAgent(Player):
             self.players.append(Player("Player " + str(i), self.window, new_start_city,
                                        LearningAgent.player_colours[i], i*5))
         self.current_turn = 0
+        return
+    
+    def update_state(self):
         return
