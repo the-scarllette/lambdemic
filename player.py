@@ -61,6 +61,7 @@ class Player(GameObject):
         print("Enter the card to add to the hand of " + self.__name)
         to_add = input()
         print(to_add)
+        return
 
     def discard_card_by_name(self, card_name):
         discarded = False
@@ -96,6 +97,12 @@ class Player(GameObject):
         for i in range(self.__cards_in_hand):
             self.__hand_image[i].undraw()
             self.__hand_image[i].draw(self.window)
+
+    def has_card(self, card_to_check):
+        for card in self.__hand:
+            if card.equals(card_to_check):
+                return True
+        return False
 
     def has_name(self, name):
         return self.__name == name

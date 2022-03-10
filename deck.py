@@ -47,6 +47,9 @@ class Deck(GameObject):
         self.__cards_in_deck -= 1
         card = self.__deck.pop(self.__cards_in_deck)
         return card
+    
+    def get_discard_pile(self):
+        return self.__discard_pile
 
     def get_number_of_cards(self):
         return self.__cards_in_deck

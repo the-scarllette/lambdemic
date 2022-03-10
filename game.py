@@ -328,6 +328,7 @@ class Game:
         self.__infection_deck.discard_card(card)
         self.__infection_deck.restack_discard_pile()
         self.__epidemic_count += 1
+        return
 
     def end_game(self):
         self.__game_running = False
@@ -411,6 +412,18 @@ class Game:
             if city.has_name(name):
                 return city
         return None
+    
+    def get_discarded_city_cards(self):
+        return self.__player_deck.get_discard_pile()
+    
+    def get_epidemics(self):
+        return self.__epidemic_count
+
+    def get_infection_discard_pile(self):
+        return self.__infection_deck.get_discard_pile()
+
+    def get_outbreaks(self):
+        return self.__outbreak_tracker.get_outbreaks()
 
     def graph_results(self):
         self.__results_manager.graph_results()

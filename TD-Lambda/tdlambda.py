@@ -44,6 +44,7 @@ class TDLambda(LearningAgent):
             self.load_neural_net()
         
         self.current_state = {}
+        self.cities = self.game.get_cities()
         return
     
     def act(self):
@@ -66,5 +67,39 @@ class TDLambda(LearningAgent):
         return
     
     def update_state(self):
-        num_cites = len(self.game.get_cities())
+        colours = self.game.Colours
+        
+        # Infected Cities
+        self.current_state['infected_cities'] = {colour: {i: [city for city in self.cities if city.get_cubes(colour)]
+                                                          for i in range(1, 4)} for colour in colours}
+        
+        # Number of outbreaks
+        self.current_state['outbreaks'] = self.game.get_outbreaks()
+        
+        # Research stations
+        self.current_state['research_stations'] = self.game.get_research_stations()
+        
+        # Player locations
+        self.current_state['player_locations'] = [player.get_city() for player in self.players]
+        
+        # City card locations
+        self.current_state['city_cards'] = {'player_hands': [[] for player in self.players], 'discarded': []}
+        for card  in self.game.get_discarded_city_cards():
+            card_added = False
+            for i in range(self.num_players):
+                if self.players[i].has_card(card):
+                    self.current_state['city_cards']['player_hands'][i].append(card)
+                    card_added = True
+                    break
+            if not card_added:
+                self.current_state['city_cards']['discarded'].append(card)
+        
+        # Infection Cards in discard pile
+        self.current_state['infection_cards'] = self.game.get_infection_discard_pile()
+        
+        # Number of epidemics drawn
+        self.current_state['epidemics'] = self.game.get_epidemics()
+
+        # Cured diseases
+        self.current_state['cured_diseases'] = [colour for colour in colours if self.game.is_cured(colour)]
         return
