@@ -56,6 +56,15 @@ class Player(GameObject):
         text.setFill(card.get_colour())
         self.__hand_image.append(text)
         self.__cards_in_hand += 1
+    
+    def can_cure(self, colour):
+        cards_needed = 5
+        for card in self.__hand:
+            if card.has_colour(colour):
+                cards_needed -= 1
+                if colour <= 0:
+                    return True
+        return False
 
     def click(self):
         print("Enter the card to add to the hand of " + self.__name)
@@ -97,6 +106,10 @@ class Player(GameObject):
         for i in range(self.__cards_in_hand):
             self.__hand_image[i].undraw()
             self.__hand_image[i].draw(self.window)
+        return
+
+    def equals(self, other_player):
+        return self.has_name(other_player.get_name())
 
     def has_card(self, card_to_check):
         for card in self.__hand:
@@ -106,10 +119,13 @@ class Player(GameObject):
 
     def has_name(self, name):
         return self.__name == name
+    
+    def in_city(self, city):
+        return self.__city.equals(city)
 
-    def is_city_in_hand(self):
+    def is_city_in_hand(self, city_to_check=self.__city):
         for card in self.__hand:
-            if card.get_name() == self.__city.get_name():
+            if card.get_name() == city_to_check.get_name():
                 return True
         return False
 

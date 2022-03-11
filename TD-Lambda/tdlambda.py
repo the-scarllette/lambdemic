@@ -1,5 +1,8 @@
 from neuralnet.neuralnet import NeuralNet
 from learningagent import LearningAgent
+from numpy import random
+from pathnode import PathNode
+from game import Game
 
 ''' State details:
 blue infected cities: 2^48 x3 for 1, 2, 3 cubes
@@ -22,6 +25,14 @@ epidemics in deck: 4
 cured diseases: 2^4
 
 19 total inputs
+
+### Actions after_state
+
+Treat(city, colour) : if city has colour disease cubes, move to it and remove as many cubes as possible
+Discover_Cure(city, colour) : if city has research station and player can cure colour, move to city and cure disease
+Build(city) : if player has city card, move to that city and build research station
+Give(city) : if a player has that city card, go to that city and if another player is there give the card
+Take(city) : if another player has a city card and is in that city, go to that city and take the card
 '''
 
 
@@ -30,12 +41,15 @@ class TDLambda(LearningAgent):
     results_file = 'tdlambda_results.json'
     
     num_net_inputs = 19
+
+    actions = {build: 'build', cure: 'cure', give: 'give', take: 'take', treat: 'treat'}
     
-    def __init__(self, game, alpha, lamb, net_layers, player_count, window, start_city, initialise):
+    def __init__(self, game, alpha, lamb, net_layers, player_count, window, start_city, initialise, epsilon=0.0):
         super(self).__init__(game, TDLambda.learning_file, TDLambda.results_file,
                              player_count, window, start_city)
         self.alpha = alpha
         self.lamb = lamb
+        self.epsilon = epsilon
         self.net_layers = net_layers
         self.net = None
         if initialise:
@@ -48,18 +62,193 @@ class TDLambda(LearningAgent):
         return
     
     def act(self):
+        # Chooses action
+        action, after_state, params = self.choose_action()
+
+        # Takes action
+
         return
+
+    def build(self, acting_player, city):
+        # Checks if player can build in city and if there is a research station already there
+        if (not acting_player.is_city_in_hand(city)) or city.has_research_station():
+            return None
+
+        # Finding the shortest path to city
+        hand = acting_player.get_hand().copy()
+        for card in hand:
+            if card.has_city(city):
+                used_card = card
+                hand.remove(used_card)
+                break
+        start_node = self.game.find_path(acting_player.get_city(), city, hand)
+        
+        # Works out after state
+        action_points = 4
+        after_state, action_points = self.find_move_after_state(start_node, action_points)
+        if action_points <= 0:
+            return after_state
+        after_state['research_stations'].append(city)
+        after_state['city_cards']['player_hands'][self.current_turn].remove(used_card)
+        after_state['city_cards']['discarded'][acting_player_index].append(used_card)
+        return after_state
     
     def build_neural_net(self):
         self.net = NeuralNet(self.net_layers, TDLambda.num_net_inputs)
         self.net.save_net(TDLambda.learning_file)
         return
     
-    def choose_action(self, state):
-        return
+    def choose_action(self):
+        possible_actions = []
+        acting_player = self.players[self.current_turn]
+
+        # Getting all possible actions and their after_states
+        for action in TDLambda.actions:
+            for city in self.cities:
+                takes_colour_input = True
+                for colour in Game.colours:
+                    if TDLambda.actions[action] == 'cure' and not acting_player.can_cure(colour):
+                        continue
+                    if not takes_colour_input:
+                        break
+                    try:
+                        after_state = action(self, acting_player, city, colour)
+                        params = city.get_name() + " " + colour
+                    except TypeError:
+                        after_state = action(self, acting_player, city)
+                        params = city.get_name()
+                        takes_colour_input = False
+                    finally:
+                        if after_state is not None:
+                            possible_actions.append({'action': action, 'after_state': after_state, 'params': params})
+
+        # Choosing which action to take
+        if random.uniform([0, 1]) <= self.epsilon:  # Takes random action
+            choice = random.choice(possible_actions)
+            return choice['action'], choice['after_state'], choice['params']
+        # Find best action and takes it
+        max_value = self.compute_state_value(possible_actions[0]['after_state'])
+        best_action_indexes = [0]
+        for i in range(1, len(possible_actions)):
+            possible_action = possible_actions[i]
+            value = self.compute_state_value(possible_action['after_state'])
+            if value > max_value:
+                max_value = value
+                best_action_indexes = [i]
+            elif value == max_value:
+                best_action_indexes.append(i)
+        choice = possible_actions[random.choice(best_action_indexes)]
+        return choice['action'], choice['after_state'], choice['params']
+
+    def compute_state_value(self, state):
+        # Converts state into inputs
+        # Runs state through neural net
+        return 0
+
+    def cure(self, acting_player, city, colour):
+        # Checks if city has research station and if colour cured
+        if not city.has_research_station() or colour in self.current_state['cured_diseases']:
+            return None
+
+        # Finds path to city
+        hand = acting_player.get_hand().copy()
+        to_remove = []
+        for card in hand:
+            if card.has_colour(colour):
+                to_remove.append(card)
+        for card in to_remove:
+            hand.remove(card)
+        start_node = self.game.find_path(acting_player.get_city(), city, hand)
+
+        # Works out after state
+        action_points = 4
+        after_state, action_points = self.find_move_after_state(start_node, action_points)
+        if action_points <= 0:
+            return after_state
+        after_state['cured_disease'].append(colour)
+        cards_to_cure = 5
+        while cards_to_cure > 0:
+            card_to_remove = to_remove.pop()
+            after_state['city_cards']['player_hands'][self.current_turn].remove(card_to_remove)
+            after_state['city_cards']['discarded'].append(card_to_remove)
+            cards_to_cure -= 1
+        return after_state
+
+    def find_move_after_state(self, current_node, action_points):
+        after_state = self.current_state.copy()
+        while action_points > 0 and current_node.get_next_node() is not None:
+            current_node = current_node.get_next_node()
+            card_used = current_node.get_used_card()
+            if card_used is not None:
+                after_state['city_cards']['player_hands'][self.current_turn].remove(card_used)
+                after_state['city_cards']['discarded'].append(card_used)
+            action_points -= 1
+        return after_state, action_points
+
+    def give(self, acting_player, city):
+        # Checks if player has the city in their hand
+        if not acting_player.is_city_in_hand(city):
+            return None
+        
+        # Finding path to city
+        hand = acting_player.get_hand().copy()
+        for card in hand:
+            if card.has_city(city):
+                giving_card = card
+                hand.remove(giving_card)
+                break
+        start_node = self.game.find_path(acting_player.get_city(), city, hand)
+
+        # Works out after state
+        action_points = 4
+        after_state, action_points = self.find_move_after_state(start_node, action_points)
+        if action_points <= 0:
+            return after_state
+        player_index = -1
+        for i in range(self.num_players):
+            receiving_player = self.players[i]
+            if (not receiving_player.equals(acting_player)) and (receiving_player.in_city(city)):
+                player_index = i
+                break
+        if player_index == -1:
+            return after_state
+        after_state['city_cards']['player_hands'][self.current_turn].remove(giving_card)
+        after_state['city_cards']['player_hands'][player_index].append(giving_card)
+        return after_state
     
     def load_neural_net(self):
         self.net = NeuralNet(net_filename=TDLambda.learning_file)
+        return
+
+    def take(self, acting_player, city):
+        # Checks if there is a player in that city and if they have the corresponding city card in hand
+        giving_player_index = None
+        for i in range(self.num_players):
+            player = self.players[i]
+            if (not player.equals(acting_player)) and player.has_city_in_hand() and player.in_city(city):
+                giving_player_index = i
+                giving_player = player
+                break
+        if giving_player_index is None:
+            return None
+
+        # Finding path to city
+        start_node = self.game.find_path(acting_player.get_city(), city, acting_player.get_hand())
+
+        # Working out after state
+        action_points = 4
+        after_state, action_points = self.find_move_after_state(start_node, action_points)
+        if action_points <= 0:
+            return after_state
+        for card in giving_player.get_hand():
+            if card.has_city(city):
+                taking_card = card
+                break
+        after_state['city_cards']['player_hands'][giving_player_index].remove(taking_card)
+        after_state['city_cards']['player_hands'][self.current_turn].append(taking_card)
+        return after_state
+
+    def treat(self, city, colour):
         return
     
     def update_neural_net(self):
@@ -67,7 +256,7 @@ class TDLambda(LearningAgent):
         return
     
     def update_state(self):
-        colours = self.game.Colours
+        colours = Game.colours
         
         # Infected Cities
         self.current_state['infected_cities'] = {colour: {i: [city for city in self.cities if city.get_cubes(colour)]

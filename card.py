@@ -4,6 +4,7 @@ class Card:
         self.name = name
         self.discarded = False
         self.is_epidemic = False
+        return
 
     def get_name(self):
         return self.name

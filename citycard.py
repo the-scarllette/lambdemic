@@ -13,3 +13,9 @@ class CityCard(Card):
 
     def get_colour(self):
         return self.__city.get_colour()
+    
+    def has_city(self, city):
+        return city.has_name(self.get_name())
+
+    def has_colour(self, colour):
+        return self.get_colour() == colour
