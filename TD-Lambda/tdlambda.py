@@ -142,6 +142,22 @@ class TDLambda(LearningAgent):
 
     def compute_state_value(self, state):
         # Converts state into inputs
+        net_input = [0 for i in range(TDLambda.num_net_inputs)]
+
+        # Infected cities
+        num_colours = len(Game.colours)
+        for i in range(num_colours):
+            colour = Game.colours[i]
+            for num_cubes in range(1, 4):
+                net_input[i*3 + (num_cubes - 1)] = sum([city in state['infected_cities'][colour][num_cubes]
+                                                        for city in self.cities])
+
+        # Number of Outbreaks
+        index = num_colours*4
+        net_input[index] = state['outbreaks']
+
+        # Research Stations
+
         # Runs state through neural net
         return 0
 
@@ -248,8 +264,28 @@ class TDLambda(LearningAgent):
         after_state['city_cards']['player_hands'][self.current_turn].append(taking_card)
         return after_state
 
-    def treat(self, city, colour):
-        return
+    def treat(self, acting_player, city, colour):
+        # Checks if city has disease cubes of given colour
+        num_cubes = city.get_cubes(colour)
+        if num_cubes <= 0:
+            return None
+
+        # Finding path to city
+        start_node = self.game.find_path(acting_player.get_city(), city, acting_player.get_hand())
+
+        # Working out after state
+        action_points = 4
+        after_state, action_points = self.find_move_after_state(start_node, action_points)
+        if action_points <= 0:
+            return after_state
+        if self.game.is_cured(colour):
+            after_state['infected_cities'][colour][num_cubes].remove(city)
+            return after_state
+        new_num_cubes = num_cubes - action_points
+        after_state['infected_cities'][colour][num_cubes].remove(city)
+        if new_num_cubes > 0:
+            after_state['infected_cites'][colour][new_num_cubes].append(city)
+        return after_state
     
     def update_neural_net(self):
         # Terminal states are always 0 so just compares rewards
