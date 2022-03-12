@@ -3,6 +3,7 @@ from learningagent import LearningAgent
 from numpy import random
 from pathnode import PathNode
 from game import Game
+from generalfunctions import binary_to_decimal, new_base_to_decimal
 
 ''' State details:
 blue infected cities: 2^48 x3 for 1, 2, 3 cubes
@@ -24,7 +25,7 @@ epidemics in deck: 4
 
 cured diseases: 2^4
 
-19 total inputs
+18 + num_players total inputs
 
 ### Actions after_state
 
@@ -40,7 +41,7 @@ class TDLambda(LearningAgent):
     learning_file = 'tdlambda_learning_data.json'
     results_file = 'tdlambda_results.json'
     
-    num_net_inputs = 19
+    num_net_inputs = 18
 
     actions = {build: 'build', cure: 'cure', give: 'give', take: 'take', treat: 'treat'}
     
@@ -59,6 +60,7 @@ class TDLambda(LearningAgent):
         
         self.current_state = {}
         self.cities = self.game.get_cities()
+        self.num_net_inputs = TDLambda.num_net_inputs + self.player_count
         return
     
     def act(self):
@@ -94,7 +96,7 @@ class TDLambda(LearningAgent):
         return after_state
     
     def build_neural_net(self):
-        self.net = NeuralNet(self.net_layers, TDLambda.num_net_inputs)
+        self.net = NeuralNet(self.net_layers, self.num_net_inputs)
         self.net.save_net(TDLambda.learning_file)
         return
     
@@ -142,24 +144,61 @@ class TDLambda(LearningAgent):
 
     def compute_state_value(self, state):
         # Converts state into inputs
-        net_input = [0 for i in range(TDLambda.num_net_inputs)]
+        net_input = [0 for i in range(self.num_net_inputs)]
 
         # Infected cities
         num_colours = len(Game.colours)
         for i in range(num_colours):
             colour = Game.colours[i]
             for num_cubes in range(1, 4):
-                net_input[i*3 + (num_cubes - 1)] = sum([city in state['infected_cities'][colour][num_cubes]
-                                                        for city in self.cities])
+                binary_num = int(''.join([str(int(city in state['infected_cities'][colour][num_cubes]))
+                                          for city in self.cities]))
+                net_input[i*3 + (num_cubes - 1)] = binary_to_decimal(binary_num)
 
         # Number of Outbreaks
         index = num_colours*4
         net_input[index] = state['outbreaks']
 
         # Research Stations
+        index += 1
+        binary_num = int(''.join([str(int(city in state['research_stations']))
+                                  for city in self.cities]))
+        net_input[index] = binary_to_decimal(binary_num)
+
+        # Player Locations
+        for i in range(self.player_count):
+            index += 1
+            net_input[index] = self.cities.index(state['player_locations'][i])
+
+        # Player card locations
+        index += 1
+        num = ['0' for city in self.cities]
+        for i in range(self.player_count):
+            for card in state['city_cards']['player_hands'][i]:
+                num[self.cities.index(card.get_city)] = str(i + 1)
+        for card in state['city_cards']['discarded']:
+            num[self.cities.index(card.get_city)] = str(self.player_count)
+        net_input[index] = new_base_to_decimal(''.join(num), self.player_count + 1)
+
+        # Infection card locations
+        index += 1
+        num = ['0' for city in self.cities]
+        for card in state['infection_cards']:
+            num[self.cities.index[card.get_city()]] = '1'
+        net_input[index] = binary_to_decimal(''.join(num))
+
+        # Epidemics drawn
+        index += 1
+        net_input[index] = state['epidemics']
+
+        # Cured diseases
+        index += 1
+        num = [str(int(colour in state['cured_diseases'])) for colour in Game.colours]
+        net_input[index] = binary_to_decimal(num)
 
         # Runs state through neural net
-        return 0
+        result = self.net.compute_net(net_input)
+        return result
 
     def cure(self, acting_player, city, colour):
         # Checks if city has research station and if colour cured
@@ -199,6 +238,7 @@ class TDLambda(LearningAgent):
                 after_state['city_cards']['player_hands'][self.current_turn].remove(card_used)
                 after_state['city_cards']['discarded'].append(card_used)
             action_points -= 1
+        after_state['player_locations'][self.current_state] = current_node.get_city()
         return after_state, action_points
 
     def give(self, acting_player, city):
@@ -221,7 +261,7 @@ class TDLambda(LearningAgent):
         if action_points <= 0:
             return after_state
         player_index = -1
-        for i in range(self.num_players):
+        for i in range(self.num_net_):
             receiving_player = self.players[i]
             if (not receiving_player.equals(acting_player)) and (receiving_player.in_city(city)):
                 player_index = i
@@ -239,7 +279,7 @@ class TDLambda(LearningAgent):
     def take(self, acting_player, city):
         # Checks if there is a player in that city and if they have the corresponding city card in hand
         giving_player_index = None
-        for i in range(self.num_players):
+        for i in range(self.num_net_):
             player = self.players[i]
             if (not player.equals(acting_player)) and player.has_city_in_hand() and player.in_city(city):
                 giving_player_index = i
@@ -311,7 +351,7 @@ class TDLambda(LearningAgent):
         self.current_state['city_cards'] = {'player_hands': [[] for player in self.players], 'discarded': []}
         for card  in self.game.get_discarded_city_cards():
             card_added = False
-            for i in range(self.num_players):
+            for i in range(self.player_count):
                 if self.players[i].has_card(card):
                     self.current_state['city_cards']['player_hands'][i].append(card)
                     card_added = True
