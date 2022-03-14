@@ -15,7 +15,7 @@ class Game:
 
     colours = ["blue", "yellow", "black", "red"]
 
-    def __init__(self, window, mode, agent, use_graphics, auto_run, print_results, teach_agent):
+    def __init__(self, window, mode, agent, use_graphics, auto_run, print_results, teach_agent = False):
         self.__player_count = 2
         self.__window = window
         self.__use_graphics = use_graphics
@@ -593,7 +593,7 @@ class Game:
                 self.end_game()
 
             # Player observes reward and transitions to next state
-            self.__results_manager.add_return(self.__player.observe_reward())
+            self.__results_manager.add_return(self.__player.observe_reward(self.__game_running))
             self.__current_turn = (self.__current_turn + 1) % len(self.__players)
         return
 
@@ -638,7 +638,9 @@ class Game:
         for i in range(self.__infection_rate):
             city = self.find_city_by_name(self.__infection_deck.draw_and_discard().get_name())
             city.inc_cubes(city.get_colour())
-            print(city.get_name() + " infected")
+            if self.__print_results:
+                print(city.get_name() + " infected")
+        return
 
     def is_cured(self, colour):
         for tracker in self.__cure_trackers:

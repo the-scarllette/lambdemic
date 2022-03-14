@@ -27,6 +27,11 @@ class NeuralNode:
         self.__num_inputs = len(self.__weights)
         return
 
+    def adjust_weights(self, adjust_amount):
+        for i in range(self.__num_inputs):
+            self.__weights[i] += adjust_amount[i]
+        return
+
     def compute(self, inputs):
         try:
             inputs[0]

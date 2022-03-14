@@ -40,6 +40,10 @@ class NeuralNet:
                                         self.__nodes[self.__columns - 2], False)
         self.__nodes[self.__columns-1].append(self.__output_node)
         return
+    
+    def adjust_node_weights(self, i, j, adjust_amount):
+        self.__nodes[i][j].adjust_weights(adjust_amount)
+        return
 
     def compute_net(self, x):
         result = [self.__nodes[0][i].compute(x[i]) for i in range(self.__rows)]
