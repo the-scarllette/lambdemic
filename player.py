@@ -123,7 +123,10 @@ class Player(GameObject):
     def in_city(self, city):
         return self.__city.equals(city)
 
-    def is_city_in_hand(self, city_to_check=self.__city):
+    def is_city_in_hand(self):
+        return self.discard_card_by_name(self.__city)
+
+    def is_city_in_hand(self, city_to_check):
         for card in self.__hand:
             if card.get_name() == city_to_check.get_name():
                 return True
