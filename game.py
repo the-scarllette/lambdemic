@@ -539,6 +539,10 @@ class Game:
                 # Cities infected
                 self.infect_cities()
 
+            # Game is re-drawn
+            if self.__use_graphics:
+                self.draw_game()
+
             # Player observes reward and updates neural net, returning reward received
             self.__results_manager.add_return(self.__player.update_neural_net())
             self.__current_turn = (self.__current_turn + 1) % len(self.__players)

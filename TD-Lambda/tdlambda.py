@@ -52,7 +52,7 @@ class TDLambda(LearningAgent):
         self.lamb = lamb
         self.epsilon = epsilon
         self.net_layers = net_layers
-        self.net = None
+        self.num_net_inputs = TDLambda.num_net_inputs + self.player_count
         if initialise:
             self.build_neural_net()
         else:
@@ -60,15 +60,57 @@ class TDLambda(LearningAgent):
         
         self.current_state = {}
         self.cities = self.game.get_cities()
-        self.num_net_inputs = TDLambda.num_net_inputs + self.player_count
         return
     
     def act(self):
         # Chooses action
         action, after_state, params = self.choose_action()
 
-        # Takes action
+        # Finding out what action chosen
+        action_str = TDLambda.actions[action]
 
+        # Taking action
+        # Moving Players
+        for i in range(self.player_count):
+            self.players[i].move_to(after_state['player_locations'][i])
+        # Adjusting state
+        match action_str:
+            case 'build':
+                params[0].set_has_res_station(True)
+                return
+            case 'cure':
+                self.game.cure_disease(params[1])
+            case 'give':
+                city_used = params[0]
+                for card in after_state['city_cards']['player_hands'][self.current_turn]:
+                    if card.has_city(city_used):
+                        return
+                for i in range(self.player_count):
+                    if i == self.current_turn:
+                        continue
+                    for card in after_state['city_cards']['player_hands'][i]:
+                        if card.has_city(city_used):
+                            self.players[self.current_turn].discard_card_by_name(city_used.get_name())
+                            self.players[i].add_to_hand(card)
+                            return
+            case 'take':
+                city_used = params[0]
+                card_used = None
+                for card in after_state['city_cards']['player_hands'][self.current_turn]:
+                    if card.has_city(city_used):
+                        card_used = card
+                if card_used is None:
+                    return
+                for i in range(self.player_count):
+                    if i == self.current_turn:
+                        continue
+                    giving_player = self.players[i]
+                    if card_used in giving_player.get_hand():
+                        giving_player.discard_card_by_name(card_used.get_name())
+                        self.players[self.current_turn].add_to_hand(city_used)
+                        return
+            case 'treat':
+                return
         return
 
     def build(self, acting_player, city):
@@ -115,10 +157,10 @@ class TDLambda(LearningAgent):
                         break
                     try:
                         after_state = action(self, acting_player, city, colour)
-                        params = city.get_name() + " " + colour
+                        params = [city, colour]
                     except TypeError:
                         after_state = action(self, acting_player, city)
-                        params = city.get_name()
+                        params = [city]
                         takes_colour_input = False
                     finally:
                         if after_state is not None:
