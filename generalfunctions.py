@@ -23,7 +23,7 @@ def elongate_str(s, filler, length):
 
 
 def new_base_to_decimal(value, base):
-    value = str(int(value)).reverse()
+    value = str(int(value))[::-1]
     result = 0
     for i in range(len(value)):
         result += int(value[i])*(base**i)

@@ -62,7 +62,7 @@ class Player(GameObject):
         for card in self.__hand:
             if card.has_colour(colour):
                 cards_needed -= 1
-                if colour <= 0:
+                if cards_needed <= 0:
                     return True
         return False
 
@@ -123,7 +123,7 @@ class Player(GameObject):
     def in_city(self, city):
         return self.__city.equals(city)
 
-    def is_city_in_hand(self):
+    def is_current_city_in_hand(self):
         return self.discard_card_by_name(self.__city)
 
     def is_city_in_hand(self, city_to_check):

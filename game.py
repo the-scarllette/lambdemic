@@ -544,7 +544,7 @@ class Game:
                 self.draw_game()
 
             # Player observes reward and updates neural net, returning reward received
-            self.__results_manager.add_return(self.__player.update_neural_net())
+            self.__results_manager.add_return(self.__player.update_neural_net(not self.__game_running))
             self.__current_turn = (self.__current_turn + 1) % len(self.__players)
         return
 
