@@ -1,3 +1,6 @@
+from numpy import cosh, tanh
+
+
 def ramp(x):
     if x <= 0:
         return 0
@@ -10,10 +13,17 @@ def ramp_derivative(x):
     return 1
 
 
-class NeuralNode:
-    activation_functions = {'ramp': {'function': ramp, 'derivative': ramp_derivative}}
+def sech_squared(x):
+    y = cosh(x)
+    y = y*y
+    return 1/y
 
-    def __init__(self, weights, i, j, input_nodes, input_node, activation_function='ramp'):
+
+class NeuralNode:
+    activation_functions = {'ramp': {'function': ramp, 'derivative': ramp_derivative},
+                            'tanh': {'function': tanh, 'derivative': sech_squared}}
+
+    def __init__(self, weights, i, j, input_nodes, input_node, activation_function='tanh'):
         self.__i = i
         self.__j = j
         self.__weights = weights

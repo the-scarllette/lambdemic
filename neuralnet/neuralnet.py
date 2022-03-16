@@ -1,6 +1,7 @@
 from neuralnet.neuralnode import NeuralNode
 import numpy as np
 import json
+import decimal
 
 
 class NeuralNet:
@@ -102,7 +103,7 @@ class NeuralNet:
         with open(file_name, "w") as net_file:
             net_data = {"columns": self.__columns, "rows": self.__rows,
                         "weights": self.__weights}
-            json.dump(net_data, net_file)
+            json.dump(net_data, net_file, allow_nan=False)
         return
 
     def set_node_weights(self, i, j, new_weights):

@@ -168,7 +168,7 @@ class ResultsManager:
         plot_pie_chart(labels_1, sizes_1)
         return
 
-    def write_data(self, infected_cities, cured_diseases):
+    def write_data(self, infected_cities=0, cured_diseases=0):
         with open(self.__file_name, 'r') as json_file:
             data = json.load(json_file)
 

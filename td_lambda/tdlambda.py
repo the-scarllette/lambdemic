@@ -57,8 +57,8 @@ def copy_state(to_copy):
 
 
 class TDLambda(LearningAgent):
-    learning_file = 'tdlambda_learning_data.json'
-    results_file = 'tdlambda_results.json'
+    learning_file = 'td_lambda/tdlambda_learning_data.json'
+    results_file = 'results/tdlambda_results.json'
     
     num_net_inputs = 18
 
@@ -66,11 +66,11 @@ class TDLambda(LearningAgent):
     
     def __init__(self, game, alpha, lamb, net_layers, player_count, window, start_city, initialise, epsilon=0.0):
         super(TDLambda, self).__init__(game, TDLambda.learning_file, TDLambda.results_file,
-                             player_count, window, start_city)
-        self.actions = {self.build: 'build',
-                        self.cure: 'cure',
-                        self.give: 'give',
+                                       player_count, window, start_city)
+        self.actions = {self.give: 'give',
+                        self.build: 'build',
                         self.take: 'take',
+                        self.cure: 'cure',
                         self.treat: 'treat'}
         self.alpha = alpha
         self.lamb = lamb
@@ -97,54 +97,36 @@ class TDLambda(LearningAgent):
         # Finding out what action chosen
         action_str = self.actions[action]
 
+        # Printing Action
+        print(action_str + " at " + params[0].get_name())
+
         # Taking action
         # Moving Players
         for i in range(self.player_count):
             self.players[i].move_to(after_state['player_locations'][i])
+        # Updating Player Hands
+        for i in range(self.player_count):
+            new_hand = after_state['city_cards']['player_hands'][i]
+            for card in new_hand:
+                if card not in self.players[i].get_hand():
+                    self.players[i].add_to_hand(card)
+            hand_len = len(self.players[i].get_hand())
+            k = 0
+            while k < hand_len:
+                card = self.players[i].get_hand()[k]
+                if card not in new_hand:
+                    self.players[i].discard_card_by_name(card.get_name())
+                    hand_len -= 1
+                    continue
+                k += 1
         # Adjusting state
         if action_str == 'build':
             res_station_city = params[0]
             res_station_city.set_has_res_station(True)
-            self.players[self.current_turn].discard_card_by_name(res_station_city.get_name())
             return
         if action_str == 'cure':
             self.game.cure_disease(params[1])
-            acting_player = self.players[self.current_turn]
-            hand = acting_player.get_hand().copy()
-            for card in hand:
-                if card not in after_state['city_cards']['player_hands'][self.current_turn]:
-                    acting_player.discard_card_by_name(card.get_name())
             return
-        if action_str == 'give':
-            city_used = params[0]
-            for card in after_state['city_cards']['player_hands'][self.current_turn]:
-                if card.has_city(city_used):
-                    return
-            for i in range(self.player_count):
-                if i == self.current_turn:
-                    continue
-                for card in after_state['city_cards']['player_hands'][i]:
-                    if card.has_city(city_used):
-                        self.players[self.current_turn].discard_card_by_name(city_used.get_name())
-                        self.players[i].add_to_hand(card)
-                        return
-        if action_str == 'take':
-            city_used = params[0]
-            card_used = None
-            for card in after_state['city_cards']['player_hands'][self.current_turn]:
-                if card.has_city(city_used):
-                    card_used = card
-                    break
-            if card_used is None:
-                return
-            for i in range(self.player_count):
-                if i == self.current_turn:
-                    continue
-                giving_player = self.players[i]
-                if card_used in giving_player.get_hand():
-                    giving_player.discard_card_by_name(card_used.get_name())
-                    self.players[self.current_turn].add_to_hand(city_used)
-                    return
         if action_str == 'treat':
             used_city = params[0]
             used_colour = params[1]
@@ -193,6 +175,8 @@ class TDLambda(LearningAgent):
 
         # Getting all possible actions and their after_states
         for action in self.actions:
+            if self.actions[action] == 'build' and len(self.game.get_research_stations()) >= 6:
+                continue
             for city in self.cities:
                 takes_colour_input = True
                 for colour in Game.colours:
@@ -208,7 +192,9 @@ class TDLambda(LearningAgent):
                         params = [city]
                         takes_colour_input = False
                     if after_state is not None:
-                        possible_actions.append({'action': action, 'after_state': after_state, 'params': params})
+                        possible_actions.append({'action': action,
+                                                 'after_state': copy_state(after_state),
+                                                 'params': params})
 
         # Choosing which action to take
         if random.uniform(0, 1) <= self.epsilon:  # Takes random action
@@ -256,7 +242,7 @@ class TDLambda(LearningAgent):
         after_state, action_points = self.find_move_after_state(start_node, action_points)
         if action_points <= 0:
             return after_state
-        after_state['cured_disease'].append(colour)
+        after_state['cured_diseases'].append(colour)
         cards_to_cure = 5
         while cards_to_cure > 0:
             card_to_remove = to_remove.pop()
@@ -322,6 +308,10 @@ class TDLambda(LearningAgent):
     
     def load_neural_net(self):
         self.net = NeuralNet(net_filename=TDLambda.learning_file)
+        return
+
+    def save_agent(self):
+        self.net.save_net(TDLambda.learning_file)
         return
 
     def state_to_net_input(self, state):
@@ -437,17 +427,16 @@ class TDLambda(LearningAgent):
         self.turn_count += 1
         
         # Observes reward
-        # -1 for each turn, +10 for curing a disease
-        try:
-            reward = self.reward_history[-1]
-        except IndexError:
-            reward = 0
-        reward += -1
+        # -1 for each turn, +10 for curing a disease, -10 for losing a game
+        reward = 1
         last_cured = self.state_history[-1]['cured_diseases']
         for colour in self.current_state['cured_diseases']:
             if colour not in last_cured:
                 reward += TDLambda.cure_reward
+        if is_terminal and len(self.current_state['cured_diseases']) < 4:
+            reward += -10
         self.reward_history.append(reward)
+        print("Reward: " + str(reward))
         
         # Updates neural net, terminal states are always 0 so just compares rewards
         temporal_diff = reward - self.compute_state_value(last_state)
@@ -473,7 +462,8 @@ class TDLambda(LearningAgent):
         colours = Game.colours
         
         # Infected Cities
-        self.current_state['infected_cities'] = {colour: {i: [city for city in self.cities if city.get_cubes(colour)]
+        self.current_state['infected_cities'] = {colour: {i: [city for city in self.cities
+                                                              if city.get_cubes(colour) == i]
                                                           for i in range(1, 4)} for colour in colours}
         
         # Number of outbreaks

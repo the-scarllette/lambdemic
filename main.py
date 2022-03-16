@@ -15,20 +15,24 @@ window = None
 if use_graphics:
     window = GraphWin("Pandemicai", width, height)
 
-num_runs = 1
+num_runs = 200
 
 lamb = 0.9
 alpha = 0.2
+epsilon = 0.1
 net_layers = 3
 
+print_states = False
+
 for i in range(num_runs):
+    print("Run " + str(i))
     initialise = i == 0
 
     # Creating Game
     game = Game(window, 'qlearning', None, use_graphics, auto_run, print_results)
 
     # Creating Agent
-    agent = TDLambda(game, alpha, lamb, net_layers, 2, window, game.get_city_by_name("Atlanta"), initialise)
+    agent = TDLambda(game, alpha, lamb, net_layers, 2, window, game.get_city_by_name("Atlanta"), initialise, epsilon)
 
     game.add_player(agent)
 
@@ -38,7 +42,8 @@ for i in range(num_runs):
         game.draw_game()
 
     # Running Game
-    game.train_td_lambda()
+    game.train_td_lambda(print_states)
+    agent.save_agent()
 
 game.graph_results()
 

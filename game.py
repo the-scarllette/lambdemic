@@ -220,11 +220,13 @@ class Game:
             self.__results_manager = ResultsManager(self.__player.get_results_filename())
 
         self.__teach_agent = teach_agent
+        self.__turn_count = 0
 
         return
 
     def add_player(self, player):
         self.__player = player
+        self.__players = [p for p in self.__player.players]
         self.__results_manager = ResultsManager(self.__player.get_results_filename())
         return
 
@@ -341,7 +343,7 @@ class Game:
         return -1
 
     def find_path(self, start_city, end_city, cards_to_use=[]):
-        #uses graph search to find path
+        # uses graph search to find path
         start_node = PathNode(start_city, 0)
         if start_city.equals(end_city):
             return start_node
@@ -351,7 +353,7 @@ class Game:
             current_node = frontier.pop(0)
             cost = current_node.get_cost() + 1
 
-            #By moving
+            # By moving
             action = 'move'
             for city in current_node.get_connected_cities():
                 to_add = PathNode(city, cost, current_node, action)
@@ -362,7 +364,7 @@ class Game:
                     break
             if path_found:
                 break
-            #Shuttle flight
+            # Shuttle flight
             action = 'shuttle'
             if current_node.has_research_station():
                 for city in self.__research_stations:
@@ -374,10 +376,10 @@ class Game:
                         break
             if path_found:
                 break
-            #Charter_flight
+            # Charter_flight
             action = 'charter'
             for card in cards_to_use:
-                if card.has_name(current_node.get_name()) and not card.equals(current_node.get_used_card()):
+                if card.has_name(current_node.get_name()) and not current_node.card_in_node_path(card):
                     end_node = PathNode(end_city, cost, current_node, action, used_card=card)
                     frontier.append(end_node)
                     path_found = True
@@ -385,9 +387,9 @@ class Game:
             if path_found:
                 break
             action = 'direct'
-            #Direct Flight
+            # Direct Flight
             for card in cards_to_use:
-                if not card.equals(current_node.get_used_card()):
+                if not current_node.card_in_node_path(card):
                     to_add = PathNode(card.get_city(), cost, current_node, action, used_card=card)
                     frontier.append(to_add)
                     if to_add.get_city().equals(end_city):
@@ -395,7 +397,7 @@ class Game:
                         end_node = to_add
                         break
 
-        #Generating path from end_node
+        # Generating path from end_node
         finished_path = False
         current_node = end_node
         while not finished_path:
@@ -443,6 +445,7 @@ class Game:
             if card.is_epidemic:
                 self.epidemic()
                 continue
+            self.__player_deck.discard_card(card)
             player.add_to_hand(card)
             player.draw()
         return True
@@ -518,11 +521,64 @@ class Game:
             if not tracker.is_cured():
                 return False
         return True
+    
+    def print_state(self):
+        # Infected Cities
+        infected_cities = {colour: {i: [city.get_name() for city in self.__cities if city.get_cubes(colour) == i]
+                                    for i in range(1, 4)} for colour in Game.colours}
+        print("Infected cities:")
+        for colour in Game.colours:
+            print(colour)
+            for i in range(1, 4):
+                print(str(i) + ": " + str(infected_cities[colour][i]))
+        
+        # Outbreaks
+        print("Outbreaks\n" + str(self.get_outbreaks()))
+        
+        # Research stations
+        print("Research stations")
+        res_str = ""
+        for city in self.__research_stations:
+            res_str += (city.get_name() + " ")
+        print(res_str)
+        
+        # Player locations
+        print("Player locations")
+        for player in self.__players:
+            print(player.get_city().get_name())
+        
+        # Player hands
+        print("Player hands")
+        for player in self.__players:
+            hand_str = ""
+            for card in player.get_hand():
+                hand_str += (card.get_name() + " ")
+            print(hand_str)
+        
+        # Infection cards in discard pile
+        print("Infection discard pile")
+        infection_str = ""
+        for card in self.get_infection_discard_pile():
+            infection_str += (card.get_name() + " ")
+        print(infection_str)
 
-    def train_td_lambda(self):
+        # Number of epidemics drawn
+        print("Number of epidemics\n" + str(self.__epidemic_count))
+
+        # Cured diseases
+        print("Cured diseases")
+        for colour in Game.colours:
+            if self.is_cured(colour):
+                print(colour)
+        
+        return
+
+    def train_td_lambda(self, print_states):
         self.__game_running = True
 
         while self.__game_running:
+            if print_states:
+                self.print_state()
             # Agent takes Action
             self.__player.act()
             # Partially transitions to next game stat
@@ -543,9 +599,19 @@ class Game:
             if self.__use_graphics:
                 self.draw_game()
 
+            if not self.__game_running:
+                print("terminal")
+
             # Player observes reward and updates neural net, returning reward received
             self.__results_manager.add_return(self.__player.update_neural_net(not self.__game_running))
             self.__current_turn = (self.__current_turn + 1) % len(self.__players)
+            self.__turn_count += 1
+
+        cured_diseases = 0
+        for colour in Game.colours:
+            if self.is_cured(colour):
+                cured_diseases += 1
+        self.__results_manager.write_data(cured_diseases=cured_diseases)
         return
 
     def run_game(self):

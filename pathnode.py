@@ -6,6 +6,7 @@ charter
 direct
 shuttle'''
 
+
 class PathNode:
 
     def __init__(self, city, cost, prev_node=None, action=None, used_card=None):
@@ -17,6 +18,16 @@ class PathNode:
         self.__next_node = None
         self.__action_to_get_to_next = None
         return
+
+    def card_in_node_path(self, card_to_check):
+        current_node = self
+        while current_node is not None:
+            used_card = current_node.get_used_card()
+            if used_card is not None:
+                if used_card.equals(card_to_check):
+                    return True
+            current_node = current_node.get_previous_node()
+        return False
 
     def get_arriving_action(self):
         return self.__action_to_arrive

@@ -58,6 +58,8 @@ class Deck(GameObject):
         shuffle(self.__discard_pile)
         for card in self.__discard_pile:
             self.add_card(card)
+        self.__discard_pile = []
+        return
 
     def shuffle(self):
         shuffle(self.__deck)
