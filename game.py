@@ -611,7 +611,8 @@ class Game:
         for colour in Game.colours:
             if self.is_cured(colour):
                 cured_diseases += 1
-        self.__results_manager.write_data(cured_diseases=cured_diseases)
+        self.__results_manager.write_data(cured_diseases=cured_diseases, turn_count=self.__turn_count)
+        print("Turns survived " + str(self.__turn_count))
         return
 
     def run_game(self):

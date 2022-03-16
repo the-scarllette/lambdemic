@@ -15,18 +15,20 @@ window = None
 if use_graphics:
     window = GraphWin("Pandemicai", width, height)
 
-num_runs = 200
+num_runs = 100
 
 lamb = 0.9
-alpha = 0.2
+alpha = 0.5
 epsilon = 0.1
 net_layers = 3
 
+initialise = True
 print_states = False
 
 for i in range(num_runs):
     print("Run " + str(i))
-    initialise = i == 0
+    if initialise:
+        initialise = i == 0
 
     # Creating Game
     game = Game(window, 'qlearning', None, use_graphics, auto_run, print_results)

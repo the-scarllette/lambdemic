@@ -93,19 +93,6 @@ class ResultsManager:
         # Printing number of runs
         print("Number of runs: " + str(len(graph_data["run"])))
 
-        # Graphing Infected Cities
-        y = []
-        for data in graph_data["run"]:
-            y.append(data["infected_cities"])
-        x = [i for i in range(len(y))]
-
-        plt.plot(x, y)
-        plt.xlabel('run number')
-        plt.ylabel('infected cities at run end')
-        plt.title('Infected Cities at run end')
-
-        plt.show()
-
         self.graph_and_save('return_sum.pdf')
 
         # Graphing turns survived
@@ -168,11 +155,11 @@ class ResultsManager:
         plot_pie_chart(labels_1, sizes_1)
         return
 
-    def write_data(self, infected_cities=0, cured_diseases=0):
+    def write_data(self, infected_cities=0, cured_diseases=0, turn_count=0):
         with open(self.__file_name, 'r') as json_file:
             data = json.load(json_file)
 
-        data["run"].append({'turn_count': self.__turn_count,
+        data["run"].append({'turn_count': turn_count,
                             'infected_cities': infected_cities,
                             'cured_diseases': cured_diseases,
                             'return': self.__returns_sum})

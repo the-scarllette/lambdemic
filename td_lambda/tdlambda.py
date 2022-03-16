@@ -428,7 +428,7 @@ class TDLambda(LearningAgent):
         
         # Observes reward
         # -1 for each turn, +10 for curing a disease, -10 for losing a game
-        reward = 1
+        reward = -1
         last_cured = self.state_history[-1]['cured_diseases']
         for colour in self.current_state['cured_diseases']:
             if colour not in last_cured:

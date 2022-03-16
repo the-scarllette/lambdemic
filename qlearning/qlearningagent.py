@@ -288,7 +288,6 @@ class QLearningAgent(LearningAgent):
                     cured_num = "0" + cured_num
 
                 # Possible Actions
-                # Add possible actions
                 state = num_cities + cured_num
                 data[state] = []
                 for action in QLearningAgent.possible_actions_str:
