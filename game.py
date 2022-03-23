@@ -234,6 +234,10 @@ class Game:
         self.__research_stations.append(city_to_add)
         return
 
+    def average_graph(self, num_agents):
+        self.__results_manager.average_graph(num_agents)
+        return
+
     def remove_res_station(self, city_to_remove):
         self.__research_stations.remove(city_to_remove)
         return
@@ -427,8 +431,8 @@ class Game:
     def get_outbreaks(self):
         return self.__outbreak_tracker.get_outbreaks()
 
-    def graph_results(self):
-        self.__results_manager.graph_results()
+    def graph_results(self, agent_num=None):
+        self.__results_manager.graph_results(agent_num)
         return
 
     def is_cured(self, colour):
@@ -573,7 +577,7 @@ class Game:
         
         return
 
-    def train_td_lambda(self, print_states):
+    def train_td_lambda(self, print_states=False, agent_num=None):
         self.__game_running = True
 
         while self.__game_running:
@@ -611,7 +615,8 @@ class Game:
         for colour in Game.colours:
             if self.is_cured(colour):
                 cured_diseases += 1
-        self.__results_manager.write_data(cured_diseases=cured_diseases, turn_count=self.__turn_count)
+        self.__results_manager.write_data(cured_diseases=cured_diseases, turn_count=self.__turn_count,
+                                          agent_num=agent_num)
         print("Turns survived " + str(self.__turn_count))
         return
 
@@ -848,14 +853,35 @@ class Game:
             city.set_has_outbreaked(False)
 
     def setup_game(self):
-        #Placing initial cards
+        self.__infection_rate_index = 0
+        self.__infection_rate = self.__infection_rate_track[self.__infection_rate_index]
+        self.__epidemic_count = 0
+
+        self.__cubes = {"blue": 0, "yellow": 0, "black": 0, "red": 0}
+
+        self.__research_stations = []
+        self.get_city_by_name('Atlanta').set_has_res_station(True)
+
+        self.__cure_trackers = [CureTracker(self.__window, self.colours[i], 20 * (i + 1), 10) for i in range(4)]
+
+        self.__turn_count = 0
+
+        self.__infection_deck = Deck(self.__window, 900, 10)
+        self.__player_deck = Deck(self.__window, 10, 400)
+        for city in self.__cities:
+            self.__infection_deck.add_card(CityCard(city))
+            self.__player_deck.add_card(CityCard(city))
+        self.__infection_deck.shuffle()
+        self.__player_deck.shuffle()
+
+        # Placing initial cubes
         for cubes_to_place in range(1, 4):
             for i in range(3):
                 city = self.find_city_by_name(self.__infection_deck.draw_and_discard().get_name())
                 for j in range(cubes_to_place):
                     city.inc_cubes(city.get_colour())
 
-        #Dealing cards to players
+        # Dealing cards to players
         if self.__mode == 'random':
             for player in self.__players:
                 for i in range(4):
@@ -866,8 +892,7 @@ class Game:
                 cards_to_add.append(self.__player_deck.draw_and_discard())
             self.__player.initial_hands(cards_to_add)
 
-
-        #Shuffling in Epidemics
+        # Shuffling in Epidemics
         self.__player_deck.add_epidemics(self.__epidemics)
 
         # Telling agent to update internal state

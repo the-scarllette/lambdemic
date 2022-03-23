@@ -6,15 +6,15 @@ def pie_chart_cures(data):
     labels = ['0', '1', '2', '3', '4']
     sizes = [0 for i in range(5)]
 
-    for run in data["run"]:
+    for run in data:
         sizes[run["cured_diseases"]] += 1
 
     # Removing 0 sizes
     i = 4
     while i >= 0:
         if sizes[i] <= 0:
-            del(sizes[i])
-            del(labels[i])
+            del (sizes[i])
+            del (labels[i])
         i -= 1
 
     plot_pie_chart(labels, sizes)
@@ -50,6 +50,39 @@ class ResultsManager:
         self.__returns_sum += value
         return
 
+    def average_graph(self, total_agents):
+        with open(self.__file_name) as json_file:
+            graph_data = json.load(json_file)
+
+        # Average result
+        ave_returns = [[] for i in range(len(graph_data["run_0"]))]
+        ave_turns_survived = [[] for i in range(len(graph_data["run_0"]))]
+
+        for k in range(total_agents - 1):
+            key = "run_" + str(k)
+            for i in range(len(graph_data[key])):
+                data = graph_data[key][i]
+                ave_returns[i].append(data['return'])
+                ave_turns_survived[i].append(data['turn_count'])
+
+        y = [sum(elm) / total_agents for elm in ave_returns]
+        x = [i for i in range(len(y))]
+
+        plt.plot(x, y)
+        plt.xlabel('run number')
+        plt.ylabel('return sum')
+        plt.title('Average Return Sum')
+        plt.show()
+
+        y = [sum(elm) / total_agents for elm in ave_turns_survived]#
+        plt.plot(x, y)
+        plt.xlabel('run number')
+        plt.ylabel('turns survived')
+        plt.title('Average Turns survived')
+        plt.show()
+
+        return
+
     def get_cured_data(self):
         with open(self.__file_name) as json_file:
             graph_data = json.load(json_file)
@@ -65,13 +98,17 @@ class ResultsManager:
         print(cured_array)
         return
 
-    def graph_and_save(self, filename):
+    def graph_and_save(self, filename, agent_num=None):
         with open(self.__file_name) as json_file:
             graph_data = json.load(json_file)
 
+        key = "run"
+        if agent_num is not None:
+            key += "_" + str(agent_num)
+
         # Graphing Sum Return
         y = []
-        for data in graph_data["run"]:
+        for data in graph_data[key]:
             y.append(data["return"])
         x = [i for i in range(len(y))]
 
@@ -83,21 +120,25 @@ class ResultsManager:
         plt.savefig(filename)
 
         # Graphing cures as pie chart
-        pie_chart_cures(graph_data)
+        pie_chart_cures(graph_data[key])
         return
 
-    def graph_results(self):
+    def graph_results(self, agent_num=None):
         with open(self.__file_name) as json_file:
             graph_data = json.load(json_file)
 
-        # Printing number of runs
-        print("Number of runs: " + str(len(graph_data["run"])))
+        key = "run"
+        if agent_num is not None:
+            key += "_" + str(agent_num)
 
-        self.graph_and_save('return_sum.pdf')
+        # Printing number of runs
+        print("Number of runs: " + str(len(graph_data[key])))
+
+        self.graph_and_save('return_sum.pdf', agent_num)
 
         # Graphing turns survived
         y = []
-        for data in graph_data["run"]:
+        for data in graph_data[key]:
             y.append(data["turn_count"])
         x = [i for i in range(len(y))]
 
@@ -155,14 +196,23 @@ class ResultsManager:
         plot_pie_chart(labels_1, sizes_1)
         return
 
-    def write_data(self, infected_cities=0, cured_diseases=0, turn_count=0):
+    def write_data(self, infected_cities=0, cured_diseases=0, turn_count=0, agent_num=None):
         with open(self.__file_name, 'r') as json_file:
             data = json.load(json_file)
 
-        data["run"].append({'turn_count': turn_count,
-                            'infected_cities': infected_cities,
-                            'cured_diseases': cured_diseases,
-                            'return': self.__returns_sum})
+        key = "run"
+        if agent_num is not None:
+            key += '_' + str(agent_num)
+        try:
+            data[key].append({'turn_count': turn_count,
+                          'infected_cities': infected_cities,
+                          'cured_diseases': cured_diseases,
+                          'return': self.__returns_sum})
+        except KeyError:
+            data[key] = [{'turn_count': turn_count,
+                          'infected_cities': infected_cities,
+                          'cured_diseases': cured_diseases,
+                          'return': self.__returns_sum}]
 
         with open(self.__file_name, 'w') as json_file:
             json.dump(data, json_file)

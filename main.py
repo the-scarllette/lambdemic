@@ -15,37 +15,43 @@ window = None
 if use_graphics:
     window = GraphWin("Pandemicai", width, height)
 
-num_runs = 100
+num_runs = 1000
 
-lamb = 0.9
-alpha = 0.5
-epsilon = 0.1
-net_layers = 3
+lamb = 0.5
+alpha = 0.001
+gamma = 0.5
+epsilon = 0.15
+net_layers = 5
 
 initialise = True
 print_states = False
 
-for i in range(num_runs):
-    print("Run " + str(i))
-    if initialise:
-        initialise = i == 0
+num_agents = 3
 
-    # Creating Game
-    game = Game(window, 'qlearning', None, use_graphics, auto_run, print_results)
 
-    # Creating Agent
-    agent = TDLambda(game, alpha, lamb, net_layers, 2, window, game.get_city_by_name("Atlanta"), initialise, epsilon)
+for k in range(num_agents):
+    for i in range(num_runs):
+        print("Run " + str(i))
 
-    game.add_player(agent)
+        game = Game(window, 'TDLambda', None, use_graphics, auto_run, print_results)
 
-    game.setup_game()
+        if i == 0:
+            # Creating Agent
+            agent = TDLambda(game, alpha, lamb, gamma, net_layers, 2, window, game.get_city_by_name("Atlanta"), epsilon)
+        else:
+            agent.reset(game)
+        game.add_player(agent)
 
-    if use_graphics:
-        game.draw_game()
+        # Setting up game
+        game.setup_game()
 
-    # Running Game
-    game.train_td_lambda(print_states)
-    agent.save_agent()
+        if use_graphics:
+            game.draw_game()
 
-game.graph_results()
+        # Running Game
+        game.train_td_lambda(print_states, k)
+    game.graph_results(k)
+
+game.average_graph(num_agents)
+
 

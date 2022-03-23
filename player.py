@@ -22,6 +22,7 @@ class Player(GameObject):
         self.__hand_image = []
 
         self.__cards_in_hand = 0
+        return
 
     def act(self):
         return
@@ -166,3 +167,9 @@ class Player(GameObject):
                 i += 1
 
         return removed
+
+    def reset_hand(self):
+        self.__hand = []
+        self.__cards_in_hand = 0
+        self.draw()
+        return

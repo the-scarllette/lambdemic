@@ -1,31 +1,53 @@
 from neuralnet.neuralnet import NeuralNet
 from learningagent import LearningAgent
 from numpy import random
-from pathnode import PathNode
 from game import Game
-from generalfunctions import binary_to_decimal, new_base_to_decimal
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from keras import layers
+import math
 
 ''' State details:
-blue infected cities: 2^48 x3 for 1, 2, 3 cubes
-Yellow infected cities: 2^48 x3 for 1, 2, 3 cubes
-Black infected cities: 2^48 x3 for 1, 2, 3 cubes
-Red infected cities: 2^48 x3 for 1, 2, 3 cubes
+for each city:
+    blue cubes:
+        has 1 cubes
+        has 2 cubes
+        has 3 cubes
+    yellow cubes:
+        has 1 cubes
+        has 2 cubes
+        has 3 cubes
+    black cubes:
+        has 1 cubes
+        has 2 cubes
+        has 3 cubes1
+    red cubes:
+        has 1 cubes
+        has 2 cubes
+        has 3 cubes
+    
+    has research station
 
-num outbreaks: 8
+    for city card:
+        in player 1-n hand
+        in discard pile
+    
+    if infection card in discard pile
+    
+    has player 1-n there
 
-research station locations: 2^48
+num outbreaks: 0-8
 
-player locations: 48^2 where player 1 is where player 2 is
+epidemics in deck: 0-4
 
-player card locations: 4^48 in deck, in player1 hand, in player 2 hand, discarded
+for each colour:
+    is cured
 
-infection card locations: 2^48 in deck or discarded
-
-epidemics in deck: 4
-
-cured diseases: 2^4
-
-18 + num_players total inputs
+# total inputs:
+48 cities: 48 * (12 + 1 + (player_count + 1) + 1 + player_count)
+other inputs: 1 + 1 + 4
+total: 726 + 96*player_count
 
 ### Actions after_state
 
@@ -59,38 +81,35 @@ def copy_state(to_copy):
 class TDLambda(LearningAgent):
     learning_file = 'td_lambda/tdlambda_learning_data.json'
     results_file = 'results/tdlambda_results.json'
-    
-    num_net_inputs = 18
 
     cure_reward = 10  # Reward for curing a disease
+    lose_game_reward = -10
     
-    def __init__(self, game, alpha, lamb, net_layers, player_count, window, start_city, initialise, epsilon=0.0):
+    def __init__(self, game, alpha, lamb, gamma, net_layers, player_count, window, start_city, epsilon=0.0):
         super(TDLambda, self).__init__(game, TDLambda.learning_file, TDLambda.results_file,
                                        player_count, window, start_city)
         self.actions = {self.give: 'give',
+                        self.treat: 'treat',
                         self.build: 'build',
                         self.take: 'take',
-                        self.cure: 'cure',
-                        self.treat: 'treat'}
+                        self.cure: 'cure'}
         self.alpha = alpha
         self.lamb = lamb
         self.epsilon = epsilon
+        self.gamma = gamma
         self.net_layers = net_layers
-        self.num_net_inputs = TDLambda.num_net_inputs + self.player_count
+        self.num_net_inputs = 726 + (96*self.player_count)
         self.net = None
-        if initialise:
-            self.build_neural_net()
-        else:
-            self.load_neural_net()
-        
+        self.build_neural_net()
         self.current_state = {}
         self.cities = self.game.get_cities()
         self.state_history = []
         self.reward_history = []
         self.turn_count = 0
+        self.gradient_tape = None
         return
     
-    def act(self):
+    def act(self, print_action=False):
         # Chooses action
         action, after_state, params = self.choose_action()
 
@@ -165,8 +184,16 @@ class TDLambda(LearningAgent):
         return after_state
     
     def build_neural_net(self):
-        self.net = NeuralNet(self.net_layers, self.num_net_inputs)
-        self.net.save_net(TDLambda.learning_file)
+        self.net = keras.Sequential()
+        init = tf.keras.initializers.HeUniform()
+        for i in range(self.net_layers - 2):
+            self.net.add(keras.layers.Dense(input_shape=(self.num_net_inputs, ), units=self.num_net_inputs,
+                                            activation='relu', use_bias=False, kernel_initializer=init))
+        self.net.add(keras.layers.Dense(input_shape=(self.num_net_inputs,), units=1, use_bias=False))
+        self.net.compile(loss=tf.keras.losses.Huber(),
+                         optimizer=tf.keras.optimizers.Adam(learning_rate=self.alpha),
+                         metrics=['accuracy'])
+        self.net.summary()
         return
     
     def choose_action(self):
@@ -219,7 +246,11 @@ class TDLambda(LearningAgent):
         net_input = self.state_to_net_input(state)
 
         # Runs state through neural net
-        result = self.net.compute_net(net_input)
+        result = self.net(net_input)
+        result = float(result[0][0])
+        if math.isnan(result) or math.isinf(result):
+            print("HERE")
+            input()
         return result
 
     def cure(self, acting_player, city, colour):
@@ -294,20 +325,37 @@ class TDLambda(LearningAgent):
         after_state['city_cards']['player_hands'][player_index].append(giving_card)
         return after_state
     
-    def lambda_return(self, i, j):
-        net_input = self.state_to_net_input(self.state_history[0])
-        gradient = self.net.gradient(net_input, i, j)
-        lam_return = [(self.lamb ** self.turn_count) * x for x in gradient]
-        for k in range(1, self.turn_count):
+    def lambda_return(self, i):
+        for k in range(0, self.turn_count):
             state = self.state_history[k]
-            net_input = self.state_to_net_input(state)
-            gradient = self.net.gradient(net_input, i, j)
-            lam_return = [lam_return[i] + ((self.lamb ** self.turn_count - k) * gradient[i])
-                          for i in range(len(gradient))]
+            with tf.GradientTape() as self.gradient_tape:
+                net_result = self.net(self.state_to_net_input(state))
+            gradient = self.gradient_tape.gradient(net_result, self.net.weights)
+            gradient = gradient[i]
+            modifier = self.lamb ** (self.turn_count - k)
+            gradient = modifier * gradient
+            if k <= 0:
+                lam_return = gradient
+            else:
+                lam_return += gradient
         return lam_return
     
     def load_neural_net(self):
         self.net = NeuralNet(net_filename=TDLambda.learning_file)
+        return
+
+    def reset(self, new_game=None):
+        self.current_state = {}
+        self.state_history = []
+        self.reward_history = []
+        self.turn_count = 0
+        if new_game is not None:
+            self.game = new_game
+            self.cities = self.game.get_cities()
+        self.update_state()
+        for player in self.players:
+            player.reset_hand()
+            player.move_to(self.game.get_city_by_name('Atlanta'))
         return
 
     def save_agent(self):
@@ -315,58 +363,75 @@ class TDLambda(LearningAgent):
         return
 
     def state_to_net_input(self, state):
-        net_input = [0 for i in range(self.num_net_inputs)]
+        net_input = [0.0 for i in range(self.num_net_inputs)]
 
-        # Infected cities
-        num_colours = len(Game.colours)
-        for i in range(num_colours):
-            colour = Game.colours[i]
-            for num_cubes in range(1, 4):
-                binary_num = int(''.join([str(int(city in state['infected_cities'][colour][num_cubes]))
-                                          for city in self.cities]))
-                net_input[i*3 + (num_cubes - 1)] = binary_to_decimal(binary_num)
+        index = 0
+        for city in self.cities:
+            # Cubes on cities
+            infected_cities = state['infected_cities']
+            for colour in Game.colours:
+                for num_cubes in range(1, 4):
+                    net_input[index] = float(city in infected_cities[colour][num_cubes])
+                    index += 1
 
-        # Number of Outbreaks
-        index = num_colours*3
-        net_input[index] = state['outbreaks']
-
-        # Research Stations
-        index += 1
-        binary_num = int(''.join([str(int(city in state['research_stations']))
-                                  for city in self.cities]))
-        net_input[index] = binary_to_decimal(binary_num)
-
-        # Player Locations
-        for i in range(self.player_count):
+            # Has research station
+            net_input[index] = float(city in state['research_stations'])
             index += 1
-            net_input[index] = self.cities.index(state['player_locations'][i])
 
-        # Player card locations
-        index += 1
-        num = ['0' for city in self.cities]
-        for i in range(self.player_count):
-            for card in state['city_cards']['player_hands'][i]:
-                num[self.cities.index(card.get_city())] = str(i + 1)
-        for card in state['city_cards']['discarded']:
-            num[self.cities.index(card.get_city())] = str(self.player_count)
-        net_input[index] = new_base_to_decimal(''.join(num), self.player_count + 1)
+            # City card locations
+            city_card_found = False
+            city_cards = state['city_cards']
+            for i in range(self.player_count):
+                for card in city_cards['player_hands'][i]:
+                    if city_card_found:
+                        break
+                    if card.has_city(city):
+                        net_input[index] = 1.0
+                        city_card_found = True
+                        break
+                index += 1
+            if not city_card_found:
+                for card in city_cards['discarded']:
+                    if card.has_city(city):
+                        net_input[index] = 1.0
+                        break
+            index += 1
 
-        # Infection card locations
-        index += 1
-        num = ['0' for city in self.cities]
-        for card in state['infection_cards']:
-            num[self.cities.index(card.get_city())] = '1'
-        net_input[index] = binary_to_decimal(''.join(num))
+            # Infection card in discard pile
+            infection_cards = state['infection_cards']
+            for card in infection_cards:
+                if card.has_city(city):
+                    net_input[index] = 1.0
+                    break
+            index += 1
 
-        # Epidemics drawn
+            # Has player there
+            for i in range(self.player_count):
+                net_input[index] = float(city.equals(state['player_locations'][i]))
+                index += 1
+
+        # Number of outbreaks
+        if state['outbreaks'] == 0:
+            value = 0.0
+        else:
+            value = float(1.0 / state['outbreaks'])
+        net_input[index] = value
         index += 1
-        net_input[index] = state['epidemics']
+
+        # Epidemics seen
+        if state['epidemics'] == 0:
+            value = 0.0
+        else:
+            value = float(1.0 / state['epidemics'])
+        net_input[index] = value
+        index += 1
 
         # Cured diseases
-        index += 1
-        num = [str(int(colour in state['cured_diseases'])) for colour in Game.colours]
-        net_input[index] = binary_to_decimal(''.join(num))
-        return net_input
+        for colour in Game.colours:
+            net_input[index] = float(colour in state['cured_diseases'])
+            index += 1
+
+        return np.array([net_input])
 
     def take(self, acting_player, city):
         # Checks if there is a player in that city and if they have the corresponding city card in hand
@@ -425,32 +490,40 @@ class TDLambda(LearningAgent):
         self.state_history.append(last_state)
         self.update_state()
         self.turn_count += 1
-        
+
         # Observes reward
-        # -1 for each turn, +10 for curing a disease, -10 for losing a game
-        reward = -1
+        # 1 for each turn
+        reward = 1
         last_cured = self.state_history[-1]['cured_diseases']
         for colour in self.current_state['cured_diseases']:
-            if colour not in last_cured:
-                reward += TDLambda.cure_reward
+            reward += TDLambda.cure_reward
         if is_terminal and len(self.current_state['cured_diseases']) < 4:
-            reward += -10
+            reward += TDLambda.lose_game_reward
         self.reward_history.append(reward)
         print("Reward: " + str(reward))
         
         # Updates neural net, terminal states are always 0 so just compares rewards
         temporal_diff = reward - self.compute_state_value(last_state)
         if not is_terminal:
-            temporal_diff += self.compute_state_value(self.current_state)
-        temporal_diff *= self.alpha
+            temporal_diff += self.gamma * self.compute_state_value(self.current_state)
+
+        for k in range(0, self.turn_count):
+            state = self.state_history[k]
+            with tf.GradientTape() as g:
+                net_result = self.net(self.state_to_net_input(state))
+            gradient = g.gradient(net_result, self.net.weights)
+            modifier = self.lamb ** (self.turn_count - k - 1)
+            update_amounts = [tf.math.scalar_mul(modifier, gradient[grad]) for grad in range(self.net_layers - 1)]
+            if k <= 0:
+                lam_return = update_amounts
+            else:
+                lam_return = [tf.math.add(update_amounts[j], lam_return[j]) for j in range(self.net_layers - 1)]
         for i in range(self.net_layers - 1):
-            for j in range(self.num_net_inputs):
-                lam_return = self.lambda_return(i, j)
-                adjust_value = [temporal_diff * lam_return[k] for k in range(len(lam_return))]
-                self.net.adjust_node_weights(i, j, adjust_value)
-        lam_return = self.lambda_return(self.net_layers - 1, 0)
-        adjust_value = [temporal_diff * lam_return[k] for k in range(len(lam_return))]
-        self.net.adjust_node_weights(self.net_layers - 1, 0, adjust_value)
+            layer = self.net.get_layer(index=i)
+            weights = layer.get_weights()
+            to_add = tf.math.scalar_mul(self.alpha * temporal_diff, lam_return[i])
+            new_weights = tf.math.add(weights, to_add)
+            layer.set_weights(new_weights)
         
         # Changes current turn
         self.current_turn = (self.current_turn + 1) % self.player_count
