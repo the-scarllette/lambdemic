@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow import keras
 from keras.layers import Dense
-from player import Player
+from learningagent import LearningAgent
 from game import Game
 
 ''' State details:
@@ -60,7 +60,7 @@ Take(city) : if another player has a city card and is in that city, go to that c
 '''
 
 
-class DQNAgent(Player):
+class DQNAgent(LearningAgent):
     learning_file = 'dqn/dqn_learning_data.json'
     results_file = 'results/dqn_results.json'
 
@@ -71,11 +71,6 @@ class DQNAgent(Player):
                  net_layers=[64], memory_size=10000, batch_size=32):
         super(DQNAgent, self).__init__(game, DQNAgent.learning_file, DQNAgent.results_file,
                                        player_count, window, start_city)
-        self.actions = {self.give: 'build',
-                        self.treat: 'cure',
-                        self.build: 'give',
-                        self.take: 'take',
-                        self.cure: 'treat'}
 
         self.alpha = alpha
         self.epsilon = epsilon
@@ -83,8 +78,6 @@ class DQNAgent(Player):
         self.net_layers = net_layers
         self.num_net_layers = len(self.net_layers)
         self.state_shape = 726 + (96 * self.player_count)
-        self.net = None
-        self.build_neural_net(initialise)
         self.current_state = {}
         self.turn_count = 0
         self.batch_size = batch_size
@@ -92,35 +85,72 @@ class DQNAgent(Player):
         self.cities = self.game.get_cities()
 
         num_cities = len(self.cities)
+        self.action_functions = {self.build: {'name': 'build', 'use_colour': False},
+                                 self.cure: {'name': 'cure', 'use_colour': True},
+                                 self.give: {'name': 'give', 'use_colour': False},
+                                 self.take: {'name': 'take', 'use_colour': False},
+                                 self.treat: {'name': 'treat', 'use_colour': True}}
+        self.actions = []
+        for action in self.action_functions:
+            to_add = [[action, city] for city in self.cities]
+            if not self.action_functions[action]['use_colour']:
+                for elm in to_add:
+                    elm.append(None)
+            else:
+                new_to_add = [elm + [colour] for elm in to_add for colour in self.colours]
+                to_add = new_to_add
+            self.actions += to_add
         self.num_actions = (3 * num_cities) + (2 * num_cities * len(DQNAgent.colours))
         self.memory = []
         self.memory_size = memory_size
+
+        self.net = None
+        self.build_neural_net(initialise)
         return
 
     # TODO: add action functions
 
     # Add act
-    def act(self):
+    def act(self, print_action=False):
+        # Chooses action
+        action, after_state, params = self.choose_action()
+        return
+
+    def build(self):
         return
 
     def build_neural_net(self, initialise):
         self.net = keras.Sequential()
         if initialise:
-            self.q_net.add(Dense(units=self.model_layers[0],
-                                 activation='relu',
-                                 input_dim=self.state_shape))
+            self.net.add(Dense(units=self.net_layers[0],
+                               activation='relu',
+                               input_dim=self.state_shape))
             for i in range(1, self.num_net_layers):
-                self.q_net.add(Dense(units=self.model_layers[i],
-                                     activation='relu'))
-            self.q_net.add(Dense(units=self.num_actions, activation='linear'))
-            self.q_net.compile(optimizer=tf.keras.optimizers.Adam(lr=self.alpha),
-                               loss='mse',
-                               metrics=['mae', 'mse'])
+                self.net.add(Dense(units=self.net_layers[i],
+                                   activation='relu'))
+            self.net.add(Dense(units=self.num_actions, activation='linear'))
+            self.net.compile(optimizer=tf.keras.optimizers.Adam(lr=self.alpha),
+                             loss='mse',
+                             metrics=['mae', 'mse'])
         else:
             print("Cannot load data from file")
             return
             # TODO: add load net from file
         self.net.summary()
+        return
+
+    # Add Choose action
+    def choose_action(self):
+        possible_actions = []
+        acting_player = self.players[self.current_turn]
+
+        return
+
+    # Add cure
+    def cure(self):
+        return
+
+    def give(self):
         return
 
     # Add learn
@@ -138,3 +168,10 @@ class DQNAgent(Player):
     # Add transitioning to next state
     def transition(self, terminal):
         return
+
+    def take(self):
+        return
+
+    def treat(self):
+        return
+
