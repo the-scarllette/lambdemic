@@ -58,8 +58,9 @@ Give(city) : if a player has that city card, go to that city and if another play
 Take(city) : if another player has a city card and is in that city, go to that city and take the card
 
 ### Rewards
--1 for each turn
++1 for each turn
 +10 for curing a disease
+-10 for game loss
 '''
 
 

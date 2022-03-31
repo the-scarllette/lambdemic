@@ -577,7 +577,7 @@ class Game:
         
         return
 
-    def train_td_lambda(self, print_states=False, agent_num=None):
+    def train_agent(self, print_states=False, agent_num=None, learn=True):
         self.__game_running = True
 
         while self.__game_running:
@@ -606,8 +606,13 @@ class Game:
             if not self.__game_running:
                 print("terminal")
 
+            # Player saves trajectory to memory and transitions to next_state
+            self.__player.transition(not self.__game_running)
+
             # Player observes reward and updates neural net, returning reward received
-            self.__results_manager.add_return(self.__player.update_neural_net(not self.__game_running))
+            if learn:
+                reward = self.__player.learn(not self.__game_running)
+                self.__results_manager.add_return(reward)
             self.__current_turn = (self.__current_turn + 1) % len(self.__players)
             self.__turn_count += 1
 
@@ -615,7 +620,9 @@ class Game:
         for colour in Game.colours:
             if self.is_cured(colour):
                 cured_diseases += 1
-        self.__results_manager.write_data(cured_diseases=cured_diseases, turn_count=self.__turn_count,
+        if learn:
+            # TODO: Graph average returns
+            self.__results_manager.write_data(cured_diseases=cured_diseases, turn_count=self.__turn_count,
                                           agent_num=agent_num)
         print("Turns survived " + str(self.__turn_count))
         return

@@ -1,6 +1,6 @@
 from game import Game
 from graphics import *
-from td_lambda.tdlambda import TDLambda
+from dqn.dqn_agent import DQNAgent
 from results.resultsmanager import ResultsManager
 from neuralnet.neuralnet import NeuralNet
 
@@ -15,7 +15,8 @@ window = None
 if use_graphics:
     window = GraphWin("Pandemicai", width, height)
 
-num_runs = 1000
+random_episodes = 100
+num_episodes = 400 + random_episodes
 
 lamb = 0.5
 alpha = 0.001
@@ -30,14 +31,15 @@ num_agents = 3
 
 
 for k in range(num_agents):
-    for i in range(num_runs):
-        print("Run " + str(i))
+    for episode in range(num_episodes):
+        print("Run " + str(episode))
+        learn = episode > random_episodes
 
-        game = Game(window, 'TDLambda', None, use_graphics, auto_run, print_results)
+        game = Game(window, 'DQN', None, use_graphics, auto_run, print_results)
 
-        if i == 0:
+        if episode == 0:
             # Creating Agent
-            agent = TDLambda(game, alpha, lamb, gamma, net_layers, 2, window, game.get_city_by_name("Atlanta"), epsilon)
+            agent = DQNAgent(game, window, game.get_city_by_name('Atlanta'))
         else:
             agent.reset(game)
         game.add_player(agent)
@@ -49,9 +51,8 @@ for k in range(num_agents):
             game.draw_game()
 
         # Running Game
-        game.train_td_lambda(print_states, k)
-    game.graph_results(k)
+        game.train_agent(print_states, agent_num=None, learn=learn)
 
-game.average_graph(num_agents)
-
-
+# TODO: agent runs random actions
+# TODO: agent chooses action
+#
