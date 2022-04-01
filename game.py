@@ -581,6 +581,9 @@ class Game:
         self.__game_running = True
 
         while self.__game_running:
+            # Player gets state
+            self.__player.set_current_state()
+
             if print_states:
                 self.print_state()
             # Agent takes Action

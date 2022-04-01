@@ -158,31 +158,6 @@ class TDLambda(LearningAgent):
             used_city.set_cubes(used_colour, new_cube_count)
             return
         return
-
-    def build(self, acting_player, city):
-        # Checks if player can build in city and if there is a research station already there
-        if (not acting_player.is_city_in_hand(city)) or city.has_research_station():
-            return None
-
-        # Finding the shortest path to city
-        hand = acting_player.get_hand().copy()
-        for card in hand:
-            if card.has_city(city):
-                used_card = card
-                hand.remove(used_card)
-                break
-        start_node = self.game.find_path(acting_player.get_city(), city, hand)
-        
-        # Works out after state
-        action_points = 4
-        after_state, action_points = self.find_move_after_state(start_node, action_points)
-        if action_points <= 0:
-            return after_state
-        acting_player_index = self.players.index(acting_player)
-        after_state['research_stations'].append(city)
-        after_state['city_cards']['player_hands'][acting_player_index].remove(used_card)
-        after_state['city_cards']['discarded'].append(used_card)
-        return after_state
     
     def build_neural_net(self):
         self.net = keras.Sequential()
@@ -254,35 +229,6 @@ class TDLambda(LearningAgent):
             input()
         return result
 
-    def cure(self, acting_player, city, colour):
-        # Checks if city has research station and if colour cured
-        if not city.has_research_station() or colour in self.current_state['cured_diseases']:
-            return None
-
-        # Finds path to city
-        hand = acting_player.get_hand().copy()
-        to_remove = []
-        for card in hand:
-            if card.has_colour(colour):
-                to_remove.append(card)
-        for card in to_remove:
-            hand.remove(card)
-        start_node = self.game.find_path(acting_player.get_city(), city, hand)
-
-        # Works out after state
-        action_points = 4
-        after_state, action_points = self.find_move_after_state(start_node, action_points)
-        if action_points <= 0:
-            return after_state
-        after_state['cured_diseases'].append(colour)
-        cards_to_cure = 5
-        while cards_to_cure > 0:
-            card_to_remove = to_remove.pop()
-            after_state['city_cards']['player_hands'][self.current_turn].remove(card_to_remove)
-            after_state['city_cards']['discarded'].append(card_to_remove)
-            cards_to_cure -= 1
-        return after_state
-
     def find_move_after_state(self, current_node, action_points):
         after_state = copy_state(self.current_state)
         while action_points > 0 and current_node.get_next_node() is not None:
@@ -294,37 +240,6 @@ class TDLambda(LearningAgent):
             action_points -= 1
         after_state['player_locations'][self.current_turn] = current_node.get_city()
         return after_state, action_points
-
-    def give(self, acting_player, city):
-        # Checks if player has the city in their hand
-        if not acting_player.is_city_in_hand(city):
-            return None
-        
-        # Finding path to city
-        hand = acting_player.get_hand().copy()
-        for card in hand:
-            if card.has_city(city):
-                giving_card = card
-                hand.remove(giving_card)
-                break
-        start_node = self.game.find_path(acting_player.get_city(), city, hand)
-
-        # Works out after state
-        action_points = 4
-        after_state, action_points = self.find_move_after_state(start_node, action_points)
-        if action_points <= 0:
-            return after_state
-        player_index = -1
-        for i in range(self.player_count):
-            receiving_player = self.players[i]
-            if (not receiving_player.equals(acting_player)) and (receiving_player.in_city(city)):
-                player_index = i
-                break
-        if player_index == -1:
-            return after_state
-        after_state['city_cards']['player_hands'][self.current_turn].remove(giving_card)
-        after_state['city_cards']['player_hands'][player_index].append(giving_card)
-        return after_state
     
     def lambda_return(self, i):
         for k in range(0, self.turn_count):
@@ -362,128 +277,6 @@ class TDLambda(LearningAgent):
     def save_agent(self):
         self.net.save_net(TDLambda.learning_file)
         return
-
-    def state_to_net_input(self, state):
-        net_input = [0.0 for i in range(self.num_net_inputs)]
-
-        index = 0
-        for city in self.cities:
-            # Cubes on cities
-            infected_cities = state['infected_cities']
-            for colour in Game.colours:
-                for num_cubes in range(1, 4):
-                    net_input[index] = float(city in infected_cities[colour][num_cubes])
-                    index += 1
-
-            # Has research station
-            net_input[index] = float(city in state['research_stations'])
-            index += 1
-
-            # City card locations
-            city_card_found = False
-            city_cards = state['city_cards']
-            for i in range(self.player_count):
-                for card in city_cards['player_hands'][i]:
-                    if city_card_found:
-                        break
-                    if card.has_city(city):
-                        net_input[index] = 1.0
-                        city_card_found = True
-                        break
-                index += 1
-            if not city_card_found:
-                for card in city_cards['discarded']:
-                    if card.has_city(city):
-                        net_input[index] = 1.0
-                        break
-            index += 1
-
-            # Infection card in discard pile
-            infection_cards = state['infection_cards']
-            for card in infection_cards:
-                if card.has_city(city):
-                    net_input[index] = 1.0
-                    break
-            index += 1
-
-            # Has player there
-            for i in range(self.player_count):
-                net_input[index] = float(city.equals(state['player_locations'][i]))
-                index += 1
-
-        # Number of outbreaks
-        if state['outbreaks'] == 0:
-            value = 0.0
-        else:
-            value = float(1.0 / state['outbreaks'])
-        net_input[index] = value
-        index += 1
-
-        # Epidemics seen
-        if state['epidemics'] == 0:
-            value = 0.0
-        else:
-            value = float(1.0 / state['epidemics'])
-        net_input[index] = value
-        index += 1
-
-        # Cured diseases
-        for colour in Game.colours:
-            net_input[index] = float(colour in state['cured_diseases'])
-            index += 1
-
-        return np.array([net_input])
-
-    def take(self, acting_player, city):
-        # Checks if there is a player in that city and if they have the corresponding city card in hand
-        giving_player_index = None
-        for i in range(self.player_count):
-            player = self.players[i]
-            if (not player.equals(acting_player)) and player.is_current_city_in_hand() and player.in_city(city):
-                giving_player_index = i
-                giving_player = player
-                break
-        if giving_player_index is None:
-            return None
-
-        # Finding path to city
-        start_node = self.game.find_path(acting_player.get_city(), city, acting_player.get_hand())
-
-        # Working out after state
-        action_points = 4
-        after_state, action_points = self.find_move_after_state(start_node, action_points)
-        if action_points <= 0:
-            return after_state
-        for card in giving_player.get_hand():
-            if card.has_city(city):
-                taking_card = card
-                break
-        after_state['city_cards']['player_hands'][giving_player_index].remove(taking_card)
-        after_state['city_cards']['player_hands'][self.current_turn].append(taking_card)
-        return after_state
-
-    def treat(self, acting_player, city, colour):
-        # Checks if city has disease cubes of given colour
-        num_cubes = city.get_cubes(colour)
-        if num_cubes <= 0:
-            return None
-
-        # Finding path to city
-        start_node = self.game.find_path(acting_player.get_city(), city, acting_player.get_hand())
-
-        # Working out after state
-        action_points = 4
-        after_state, action_points = self.find_move_after_state(start_node, action_points)
-        if action_points <= 0:
-            return after_state
-        if self.game.is_cured(colour):
-            after_state['infected_cities'][colour][num_cubes].remove(city)
-            return after_state
-        new_num_cubes = num_cubes - action_points
-        after_state['infected_cities'][colour][num_cubes].remove(city)
-        if new_num_cubes > 0:
-            after_state['infected_cities'][colour][new_num_cubes].append(city)
-        return after_state
     
     def update_neural_net(self, is_terminal):
         # Sees state change and updates state_history
@@ -531,42 +324,3 @@ class TDLambda(LearningAgent):
         
         # Returns reward
         return reward
-    
-    def update_state(self):
-        colours = Game.colours
-        
-        # Infected Cities
-        self.current_state['infected_cities'] = {colour: {i: [city for city in self.cities
-                                                              if city.get_cubes(colour) == i]
-                                                          for i in range(1, 4)} for colour in colours}
-        
-        # Number of outbreaks
-        self.current_state['outbreaks'] = self.game.get_outbreaks()
-        
-        # Research stations
-        self.current_state['research_stations'] = self.game.get_research_stations()
-        
-        # Player locations
-        self.current_state['player_locations'] = [player.get_city() for player in self.players]
-        
-        # City card locations
-        self.current_state['city_cards'] = {'player_hands': [[] for player in self.players], 'discarded': []}
-        for card in self.game.get_discarded_city_cards():
-            card_added = False
-            for i in range(self.player_count):
-                if self.players[i].has_card(card):
-                    self.current_state['city_cards']['player_hands'][i].append(card)
-                    card_added = True
-                    break
-            if not card_added:
-                self.current_state['city_cards']['discarded'].append(card)
-        
-        # Infection Cards in discard pile
-        self.current_state['infection_cards'] = self.game.get_infection_discard_pile()
-        
-        # Number of epidemics drawn
-        self.current_state['epidemics'] = self.game.get_epidemics()
-
-        # Cured diseases
-        self.current_state['cured_diseases'] = [colour for colour in colours if self.game.is_cured(colour)]
-        return
