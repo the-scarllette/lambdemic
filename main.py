@@ -1,8 +1,7 @@
 from game import Game
 from graphics import *
 from dqn.dqn_agent import DQNAgent
-from results.resultsmanager import ResultsManager
-from neuralnet.neuralnet import NeuralNet
+from graphing import graph_local_average
 
 # Initialising Window
 width = 1000
@@ -15,22 +14,26 @@ window = None
 if use_graphics:
     window = GraphWin("Pandemicai", width, height)
 
-random_episodes = 100
-num_episodes = 400 + random_episodes
+random_episodes = 500
+training_episodes = 1000
+num_episodes = training_episodes + random_episodes
 
-lamb = 0.5
-alpha = 0.001
-gamma = 0.5
-epsilon = 0.15
-net_layers = 5
+alpha = 0.0000000001
+gamma = 0.99
+epsilon = 0.1
 
 initialise = True
 print_states = False
+print_actions = True
+print_reward = True
 
-num_agents = 3
+use_target_network = True
+target_update_count = 100
 
+num_agents = 1
 
 for k in range(num_agents):
+    total_rewards = []
     for episode in range(num_episodes):
         print("Run " + str(episode))
         learn = episode > random_episodes
@@ -39,7 +42,9 @@ for k in range(num_agents):
 
         if episode == 0:
             # Creating Agent
-            agent = DQNAgent(game, window, game.get_city_by_name('Atlanta'))
+            agent = DQNAgent(game, window, game.get_city_by_name('Atlanta'),
+                             alpha=alpha, gamma=gamma, epsilon=epsilon, initialise=initialise,
+                             target_network=use_target_network, target_update_count=target_update_count)
         else:
             agent.reset(game)
         game.add_player(agent)
@@ -51,8 +56,10 @@ for k in range(num_agents):
             game.draw_game()
 
         # Running Game
-        game.train_agent(print_states, agent_num=None, learn=learn)
+        total_reward = game.train_agent(print_states, print_actions=print_actions, agent_num=None, learn=learn)
+        if learn:
+            total_rewards.append(total_reward)
+        if print_reward:
+            print("Total Reward: " + str(total_reward))
+    graph_local_average(total_rewards, c=training_episodes // 100)
 
-# TODO: agent runs random actions
-# TODO: agent chooses action
-#

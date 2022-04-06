@@ -1,3 +1,5 @@
+import math
+
 import tensorflow as tf
 from tensorflow import keras
 from keras.layers import Dense
@@ -62,15 +64,48 @@ Take(city) : if another player has a city card and is in that city, go to that c
 '''
 
 
+def copy_state(to_copy):
+    new_state = {'infected_cities': {colour: {i: [city for city in to_copy['infected_cities'][colour][i]]
+                                              for i in range(1, 4)} for colour in Game.colours},
+                 'outbreaks': to_copy['outbreaks'],
+                 'research_stations': [city for city in to_copy['research_stations']],
+                 'player_locations': [city for city in to_copy['player_locations']],
+                 'city_cards': {'player_hands': [[card for card in player_hand]
+                                                 for player_hand in to_copy['city_cards']['player_hands']],
+                                'discarded': [card for card in to_copy['city_cards']['discarded']]},
+                 'infection_cards': [card for card in to_copy['infection_cards']], 'epidemics': to_copy['epidemics'],
+                 'cured_diseases': [colour for colour in to_copy['cured_diseases']]}
+
+    return new_state
+
+
+def reward_function(state, next_state, terminal):
+    reward = DQNAgent.turn_reward
+
+    for colour in next_state['cured_diseases']:
+        if colour not in state['cured_diseases']:
+            reward += DQNAgent.cure_reward
+
+    if terminal and len(next_state['cured_diseases']) < 4:
+        reward += DQNAgent.lose_game_reward
+
+    return reward
+
+
 class DQNAgent(LearningAgent):
     learning_file = 'dqn/dqn_learning_data.json'
     results_file = 'results/dqn_results.json'
 
     colours = Game.colours
 
-    def __init__(self, game, window, start_city, initialise=True, player_count=2,
-                 alpha=0.0001, gamma=0.9, epsilon=0.1,
-                 net_layers=[64], memory_size=10000, batch_size=32):
+    turn_reward = 0
+    cure_reward = 1
+    lose_game_reward = -1
+
+    def __init__(self, game, window, start_city, initialise=True, target_network=False, target_update_count=32,
+                 mask_action_values=True,
+                 player_count=2, alpha=0.0001, gamma=0.9, epsilon=0.1,
+                 net_layers=[256, 128, 64], memory_size=1000000, batch_size=256):
         super(DQNAgent, self).__init__(game, DQNAgent.learning_file, DQNAgent.results_file,
                                        player_count, window, start_city)
 
@@ -82,6 +117,7 @@ class DQNAgent(LearningAgent):
         self.state_shape = 726 + (96 * self.player_count)
         self.current_state = {}
         self.turn_count = 0
+        self.total_step_count = 0
         self.batch_size = batch_size
 
         self.cities = self.game.get_cities()
@@ -93,40 +129,49 @@ class DQNAgent(LearningAgent):
                                  self.take: {'name': 'take', 'use_colour': False},
                                  self.treat: {'name': 'treat', 'use_colour': True}}
         self.actions = []
-        for action in self.action_functions:
-            to_add = [[action, city] for city in self.cities]
-            if not self.action_functions[action]['use_colour']:
-                for elm in to_add:
-                    elm.append(None)
-            else:
-                new_to_add = [elm + [colour] for elm in to_add for colour in self.colours]
-                to_add = new_to_add
-            self.actions += to_add
+        self.fill_actions()
         self.num_actions = (3 * num_cities) + (2 * num_cities * len(DQNAgent.colours))
         self.memory = []
         self.memory_size = memory_size
 
-        self.net = None
-        self.build_neural_net(initialise)
+        self.mask_action_values = mask_action_values
+
+        self.target_net = None
+        self.target_update_count = target_update_count
+        self.using_target_net = target_network
+        self.net = self.build_neural_net(initialise)
+        self.net.summary()
+        if self.using_target_net:
+            self.target_net = self.build_neural_net(initialise)
+            self.update_target_net()
+        input("Run?")
         return
 
-    # TODO: add action functions
-
-    def act(self, print_action=False):
+    def act(self, print_action=False, random_actions=False):
         # Chooses action
-        action_index = self.choose_action()
+        action_index = self.choose_action(random_actions=random_actions)
+        if action_index >= self.num_actions:
+            print("Out of bounds index with " + str(action_index))
+            input()
         action = self.actions[action_index]
 
         # Finds after state
+        action_function = action[0]
         city_used = action[1]
         colour_used = action[2]
         if colour_used is None:
-            after_state = action[0](self, city_used)
+            after_state = action_function(city_used)
         else:
-            after_state = action[0](self, city_used, colour_used)
+            after_state = action_function(city_used, colour_used)
 
+        action_str = self.action_functions[action_function]['name']
+
+        if print_action:
+            to_print = action_str + " at " + city_used.get_name()
+            if colour_used is not None:
+                to_print += " with colour " + colour_used
+            print(to_print)
         # Transitions to after state
-        action_str = self.action_functions[action]['name']
         # Moving Players
         for i in range(self.player_count):
             self.players[i].move_to(after_state['player_locations'][i])
@@ -148,20 +193,17 @@ class DQNAgent(LearningAgent):
         # Adjusting state
         if action_str == 'build':
             city_used.set_has_res_station(city_used in after_state['research_stations'])
-            return
-        if action_str == 'cure':
+        elif action_str == 'cure':
             if colour_used in after_state['cured_diseases']:
                 self.game.cure_disease(colour_used)
-            return
-        if action_str == 'treat':
+        elif action_str == 'treat':
             new_cube_count = 0
             for i in range(1, 4):
                 if city_used in after_state['infected_cities'][colour_used][i]:
                     new_cube_count = i
                     break
             city_used.set_cubes(colour_used, new_cube_count)
-            return
-        return
+        return action_index
 
     def build(self, city):
         acting_player = self.players[self.current_turn]
@@ -188,35 +230,112 @@ class DQNAgent(LearningAgent):
         return after_state
 
     def build_neural_net(self, initialise):
-        self.net = keras.Sequential()
+        net = keras.Sequential()
+        init = tf.keras.initializers.HeUniform()
         if initialise:
-            self.net.add(Dense(units=self.net_layers[0],
+            net.add(Dense(units=self.net_layers[0],
                                activation='relu',
-                               input_dim=self.state_shape))
+                               input_dim=self.state_shape,
+                               use_bias=False, kernel_initializer=init))
             for i in range(1, self.num_net_layers):
-                self.net.add(Dense(units=self.net_layers[i],
-                                   activation='relu'))
-            self.net.add(Dense(units=self.num_actions, activation='linear'))
-            self.net.compile(optimizer=tf.keras.optimizers.Adam(lr=self.alpha),
+                net.add(Dense(units=self.net_layers[i],
+                                   activation='relu',
+                                   use_bias=False, kernel_initializer=init))
+            net.add(Dense(units=self.num_actions, activation='linear'))
+            net.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.alpha),
                              loss='mse',
-                             metrics=['mae', 'mse'])
+                             metrics=['mse'])
         else:
             print("Cannot load data from file")
             return
-            # TODO: add load net from file
-        self.net.summary()
+            # Add load net from file
+        return net
+
+    def can_take_action(self, action_array, state=None):
+        if state is None:
+            state = self.current_state
+
+        action = action_array[0]
+        city_name = action_array[1].get_name()
+        colour = action_array[2]
+
+        action_player = self.players[self.current_turn]
+
+        if action == self.build:  # Build: player needs city card in hand and no res station there
+            for city in state['research_stations']:
+                if city.has_name(city_name):
+                    return False
+            for card in state['city_cards']['player_hands'][self.current_turn]:
+                if card.has_name(city_name):
+                    return True
+            return False
+        if action == self.cure:  # Cure: player needs 5 or more colour of cards and res station at city
+            has_station = False
+            for city in state['research_stations']:
+                if city.has_name(city_name):
+                    has_station = True
+                    break
+            if not has_station:
+                return False
+            cards_needed = 5
+            for card in state['city_cards']['player_hands'][self.current_turn]:
+                if card.has_colour(colour):
+                    cards_needed -= 1
+            return cards_needed <= 0
+        if action == self.give:  # give: player needs the city card in hand
+            for card in state['city_cards']['player_hands'][self.current_turn]:
+                if card.has_name(city_name):
+                    return True
+            return False
+        if action == self.take:  # take: another player needs to be at the city with the card
+            for i in range(self.player_count):
+                if i == self.current_turn:
+                    continue
+                if state['player_locations'][i].has_name(city_name):
+                    for card in state['city_cards']['player_hands'][i]:
+                        if card.has_name(city_name):
+                            return True
+            return False
+        if action == self.treat:  # treat: city needs to have colour cubes on it
+            for cubes in range(1, 4):
+                for city in state['infected_cities'][colour][cubes]:
+                    if city.has_name(city_name):
+                        return True
+            return False
         return
 
-    def choose_action(self):
-        possible_actions = []
-        acting_player = self.players[self.current_turn]
-
-        if rand.uniform(0, 1) < self.epsilon:  # Takes random action
-            return rand.randint(0, self.num_actions)
+    def choose_action(self, random_actions=False):
+        if rand.uniform(0, 1) < self.epsilon or random_actions:  # Takes random action
+            possible_actions = [action_index for action_index in range(self.num_actions - 1)
+                                if self.can_take_action(self.actions[action_index])]
+            return rand.choice(possible_actions)
 
         net_input = self.state_to_net_input(self.current_state)
-        q_out = self.q_net(net_input.reshape(1, self.state_shape))
-        return np.argmax(q_out)
+        q_out = self.net(net_input.reshape(1, self.state_shape))
+
+        # Masking q_values
+        if self.mask_action_values:
+            q_out = self.mask(q_out)
+
+        max_value = q_out[0][0]
+        possible_actions = [0]
+        for i in range(1, self.num_actions):
+            value = q_out[0][i]
+            if value > max_value:
+                max_value = value
+                possible_actions = [i]
+            elif value == max_value:
+                possible_actions.append(i)
+
+        action_index = rand.choice(possible_actions)
+        result = q_out[0][action_index]
+        if math.isinf(result) or math.isnan(result):
+            print("Infinite result")
+            input()
+        if result == 0.0:
+            print("Zero result")
+            input()
+        return action_index
 
     def cure(self, city, colour):
         acting_player = self.players[self.current_turn]
@@ -246,6 +365,31 @@ class DQNAgent(LearningAgent):
             after_state['city_cards']['discarded'].append(card_to_remove)
             cards_to_cure -= 1
         return after_state
+
+    def fill_actions(self):
+        self.actions = []
+        for action in self.action_functions:
+            to_add = [[action, city] for city in self.cities]
+            if not self.action_functions[action]['use_colour']:
+                for elm in to_add:
+                    elm.append(None)
+            else:
+                new_to_add = [elm + [colour] for elm in to_add for colour in self.colours]
+                to_add = new_to_add
+            self.actions += to_add
+        return
+
+    def find_move_after_state(self, current_node, action_points):
+        after_state = copy_state(self.current_state)
+        while action_points > 0 and current_node.get_next_node() is not None:
+            current_node = current_node.get_next_node()
+            card_used = current_node.get_used_card()
+            if card_used is not None:
+                after_state['city_cards']['player_hands'][self.current_turn].remove(card_used)
+                after_state['city_cards']['discarded'].append(card_used)
+            action_points -= 1
+        after_state['player_locations'][self.current_turn] = current_node.get_city()
+        return after_state, action_points
 
     def give(self, city):
         acting_player = self.players[self.current_turn]
@@ -279,16 +423,66 @@ class DQNAgent(LearningAgent):
         after_state['city_cards']['player_hands'][player_index].append(giving_card)
         return after_state
 
-    # Add learn
     def learn(self, terminal):
+        if self.using_target_net:
+            target_net = self.target_net
+        else:
+            target_net = self.net
+
+        experience_sample = rand.sample(self.memory, self.batch_size)
+
+        states = np.array([self.state_to_net_input(trajectory['state'])
+                           for trajectory in experience_sample])
+        next_states = np.array([self.state_to_net_input(trajectory['next_state'])
+                                for trajectory in experience_sample])
+        q_values_unmasked = target_net(next_states.reshape(self.batch_size, self.state_shape)).numpy()
+        prediction_target_unmasked = target_net(states.reshape(self.batch_size, self.state_shape)).numpy()
+        q_values = q_values_unmasked
+        prediction_target = prediction_target_unmasked
+
+        if self.mask_action_values:
+            q_values = np.array([self.mask(q_values_unmasked[i], state=experience_sample[i]['next_state'])
+                                 for i in range(self.batch_size)])
+            prediction_target = np.array([self.mask(prediction_target_unmasked[i], state=experience_sample[i]['state'])
+                                          for i in range(self.batch_size)])
+
+        for i in range(self.batch_size):
+            trajectory = experience_sample[i]
+            action_index = trajectory['action']
+            target = trajectory['reward']
+            if not trajectory['terminal']:
+                target += self.gamma * np.argmax(q_values[i][:])
+            prediction_target[i][action_index] = target
+
+        self.net.fit(states.reshape(self.batch_size, self.state_shape),
+                     prediction_target, batch_size=self.batch_size)
         return
 
-    # TODO: build agent reset
-    def reset(self):
+    def mask(self, values, state=None):
+        mask_np = np.array([self.can_take_action(action, state=state) for action in self.actions])
+
+        mask = tf.convert_to_tensor(mask_np, dtype=tf.bool)
+        mask = tf.cast(mask, dtype=tf.float32)
+
+        return values * mask
+
+    def reset(self, new_game=None):
+        self.current_state = {}
+        self.turn_count = 0
+        self.current_turn = 0
+        if new_game is not None:
+            self.game = new_game
+            self.cities = self.game.get_cities()
+            self.fill_actions()
+        for player in self.players:
+            player.reset_hand()
+            player.move_to(self.game.get_city_by_name('Atlanta'))
         return
 
-    # Add saving trajectory
-    def save_trajectory(self, terminal):
+    def save_trajectory(self, trajectory):
+        self.memory.append(trajectory)
+        if len(self.memory) > self.memory_size:
+            del (self.memory[0])
         return
 
     def set_current_state(self):
@@ -399,10 +593,6 @@ class DQNAgent(LearningAgent):
 
         return np.array([net_input])
 
-    # Add transitioning to next state, THIS NEXT
-    def transition(self, terminal):
-        return
-
     def take(self, city):
         acting_player = self.players[self.current_turn]
 
@@ -433,6 +623,33 @@ class DQNAgent(LearningAgent):
         after_state['city_cards']['player_hands'][self.current_turn].append(taking_card)
         return after_state
 
+    def transition_and_learn(self, action_index, terminal, learn):
+        # Transition to next state
+        last_state = copy_state(self.current_state)
+        self.set_current_state()
+        self.current_turn = (self.current_turn + 1) % self.player_count
+        self.turn_count += 1
+        self.total_step_count += 1
+
+        # Finding reward
+        reward = reward_function(last_state, self.current_state, terminal)
+
+        # save trajectory to memory
+        trajectory = {'state': last_state,
+                      'action': action_index,
+                      'reward': reward,
+                      'next_state': self.current_state,
+                      'terminal': terminal}
+        self.save_trajectory(trajectory)
+
+        # Learn
+        if learn:
+            self.learn(terminal)
+            # Updating target network
+            if self.total_step_count % self.target_update_count == 0:
+                self.update_target_net()
+        return reward
+
     def treat(self, city, colour):
         acting_player = self.players[self.current_turn]
 
@@ -442,7 +659,11 @@ class DQNAgent(LearningAgent):
         # Working out after state
         action_points = 4
         after_state, action_points = self.find_move_after_state(start_node, action_points)
-        num_cubes = city.get_cubes(colour)
+        num_cubes = 0
+        for i in range(1, 4):
+            if city in self.current_state['infected_cities'][colour][i]:
+                num_cubes = i
+                break
         if action_points <= 0 or num_cubes <= 0:
             return after_state
         if self.game.is_cured(colour):
@@ -454,3 +675,7 @@ class DQNAgent(LearningAgent):
             after_state['infected_cities'][colour][new_num_cubes].append(city)
         return after_state
 
+    def update_target_net(self):
+        self.target_net.set_weights(self.net.get_weights())
+        print("Updating target net")
+        return

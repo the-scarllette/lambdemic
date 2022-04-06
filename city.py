@@ -73,11 +73,15 @@ class City(GameObject):
         self.__has_outbreaked = to_set
 
     def set_has_res_station(self, to_set):
+        self.__has_res_station = to_set
         if to_set:
             self.__game.add_res_station(self)
         else:
-            self.__game.remove_res_station(self)
-        self.__has_res_station = to_set
+            try:
+                self.__game.remove_res_station(self)
+            except ValueError:
+                return
+        return
 
     def click(self):
         self.inc_cubes(self.__colour)

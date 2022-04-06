@@ -577,17 +577,18 @@ class Game:
         
         return
 
-    def train_agent(self, print_states=False, agent_num=None, learn=True):
+    def train_agent(self, print_states=False, print_actions=False, agent_num=None, learn=True):
         self.__game_running = True
+        self.__player.set_current_state()
+        total_reward = 0
 
         while self.__game_running:
             # Player gets state
-            self.__player.set_current_state()
 
             if print_states:
                 self.print_state()
             # Agent takes Action
-            self.__player.act()
+            action = self.__player.act(print_actions, not learn)
             # Partially transitions to next game stat
 
             # Checks if player has one
@@ -609,26 +610,21 @@ class Game:
             if not self.__game_running:
                 print("terminal")
 
-            # Player saves trajectory to memory and transitions to next_state
-            self.__player.transition(not self.__game_running)
-
-            # Player observes reward and updates neural net, returning reward received
+            # Player saves trajectory to memory and transitions to next_state and does learning
+            reward = self.__player.transition_and_learn(action, not self.__game_running, learn)
+            print("Reward: " + str(reward))
             if learn:
-                reward = self.__player.learn(not self.__game_running)
                 self.__results_manager.add_return(reward)
             self.__current_turn = (self.__current_turn + 1) % len(self.__players)
             self.__turn_count += 1
+            total_reward += reward
 
         cured_diseases = 0
         for colour in Game.colours:
             if self.is_cured(colour):
                 cured_diseases += 1
-        if learn:
-            # TODO: Graph average returns
-            self.__results_manager.write_data(cured_diseases=cured_diseases, turn_count=self.__turn_count,
-                                          agent_num=agent_num)
         print("Turns survived " + str(self.__turn_count))
-        return
+        return total_reward
 
     def run_game(self):
         self.__game_running = True

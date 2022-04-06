@@ -64,21 +64,6 @@ Take(city) : if another player has a city card and is in that city, go to that c
 '''
 
 
-def copy_state(to_copy):
-    new_state = {'infected_cities': {colour: {i: [city for city in to_copy['infected_cities'][colour][i]]
-                                              for i in range(1, 4)} for colour in Game.colours},
-                 'outbreaks': to_copy['outbreaks'],
-                 'research_stations': [city for city in to_copy['research_stations']],
-                 'player_locations': [city for city in to_copy['player_locations']],
-                 'city_cards': {'player_hands': [[card for card in player_hand]
-                                                 for player_hand in to_copy['city_cards']['player_hands']],
-                                'discarded': [card for card in to_copy['city_cards']['discarded']]},
-                 'infection_cards': [card for card in to_copy['infection_cards']], 'epidemics': to_copy['epidemics'],
-                 'cured_diseases': [colour for colour in to_copy['cured_diseases']]}
-
-    return new_state
-
-
 class TDLambda(LearningAgent):
     learning_file = 'td_lambda/tdlambda_learning_data.json'
     results_file = 'results/tdlambda_results.json'
@@ -228,18 +213,6 @@ class TDLambda(LearningAgent):
             print("HERE")
             input()
         return result
-
-    def find_move_after_state(self, current_node, action_points):
-        after_state = copy_state(self.current_state)
-        while action_points > 0 and current_node.get_next_node() is not None:
-            current_node = current_node.get_next_node()
-            card_used = current_node.get_used_card()
-            if card_used is not None:
-                after_state['city_cards']['player_hands'][self.current_turn].remove(card_used)
-                after_state['city_cards']['discarded'].append(card_used)
-            action_points -= 1
-        after_state['player_locations'][self.current_turn] = current_node.get_city()
-        return after_state, action_points
     
     def lambda_return(self, i):
         for k in range(0, self.turn_count):
