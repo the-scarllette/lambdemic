@@ -5,7 +5,7 @@ from graphics import *
 
 class Player(GameObject):
 
-    def __init__(self, name, window, city, colour, draw_offset):
+    def __init__(self, name, window=None, city=None, colour=None, draw_offset=None):
         self.__colour = colour
         self.__city = city
         self.__name = name

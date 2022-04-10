@@ -6,7 +6,7 @@ from epidemic_card import EpidemicCard
 
 class Deck(GameObject):
 
-    def __init__(self, window, x, y):
+    def __init__(self, window=None, x=-1, y=-1):
         super().__init__(window, x, y)
         self.__deck = []
         self.__discard_pile = []
@@ -27,6 +27,7 @@ class Deck(GameObject):
                 index = randint(0, d) + d*i
             self.__deck.insert(index, EpidemicCard())
             self.__cards_in_deck += 1
+        return
 
     def discard_card(self, card):
         self.__discard_pile.append(card)
