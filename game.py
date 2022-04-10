@@ -598,7 +598,7 @@ class Game:
             if self.__game_running:
                 # Player is given cards
                 self.__game_running = self.player_draw_cards(self.__player)
-                self.__player.discard_to_hand_limit()
+                # self.__player.discard_to_hand_limit()
 
                 # Cities infected
                 self.infect_cities()

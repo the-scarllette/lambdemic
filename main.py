@@ -10,12 +10,14 @@ use_graphics = False
 auto_run = True
 print_results = False
 
+# Add saving network
+
 window = None
 if use_graphics:
     window = GraphWin("Pandemicai", width, height)
 
 random_episodes = 500
-training_episodes = 1000
+training_episodes = 100000
 num_episodes = training_episodes + random_episodes
 
 alpha = 0.0000000001
@@ -27,7 +29,7 @@ print_states = False
 print_actions = True
 print_reward = True
 
-use_target_network = True
+use_target_network = False
 target_update_count = 100
 
 num_agents = 1
@@ -61,5 +63,5 @@ for k in range(num_agents):
             total_rewards.append(total_reward)
         if print_reward:
             print("Total Reward: " + str(total_reward))
-    graph_local_average(total_rewards, c=training_episodes // 100)
+    graph_local_average(total_rewards, c=10000)
 

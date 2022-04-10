@@ -9,6 +9,8 @@ import random as rand
 import numpy as np
 
 ''' State details:
+Current players turn
+
 for each city:
     blue cubes:
         has 1 cubes
@@ -46,8 +48,8 @@ for each colour:
 
 # total inputs:
 48 cities: 48 * (12 + 1 + (player_count + 1) + 1 + player_count)
-other inputs: 1 + 1 + 4
-total: 726 + 96*player_count
+other inputs: 1 + 1 + 1 + 4
+total: 727 + 96*player_count
 
 ### Actions after_state
 
@@ -98,14 +100,14 @@ class DQNAgent(LearningAgent):
 
     colours = Game.colours
 
-    turn_reward = 0
-    cure_reward = 1
-    lose_game_reward = -1
+    turn_reward = 1
+    cure_reward = 10
+    lose_game_reward = -10
 
     def __init__(self, game, window, start_city, initialise=True, target_network=False, target_update_count=32,
                  mask_action_values=True,
                  player_count=2, alpha=0.0001, gamma=0.9, epsilon=0.1,
-                 net_layers=[256, 128, 64], memory_size=1000000, batch_size=256):
+                 net_layers=[64], memory_size=1000000, batch_size=256):
         super(DQNAgent, self).__init__(game, DQNAgent.learning_file, DQNAgent.results_file,
                                        player_count, window, start_city)
 
@@ -114,7 +116,7 @@ class DQNAgent(LearningAgent):
         self.gamma = gamma
         self.net_layers = net_layers
         self.num_net_layers = len(self.net_layers)
-        self.state_shape = 726 + (96 * self.player_count)
+        self.state_shape = 727 + (96 * self.player_count)
         self.current_state = {}
         self.turn_count = 0
         self.total_step_count = 0
@@ -486,6 +488,9 @@ class DQNAgent(LearningAgent):
         return
 
     def set_current_state(self):
+        # Current players turn
+        self.current_state['current_turn'] = self.current_turn
+
         # Infected Cities
         self.current_state['infected_cities'] = {colour: {i: [city for city in self.cities
                                                               if city.get_cubes(colour) == i]
@@ -526,6 +531,9 @@ class DQNAgent(LearningAgent):
         net_input = [0.0 for i in range(self.state_shape)]
 
         index = 0
+        net_input[index] = state['current_turn']
+
+        index += 1
         for city in self.cities:
             # Cubes on cities
             infected_cities = state['infected_cities']
