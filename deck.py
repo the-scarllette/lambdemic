@@ -1,6 +1,7 @@
 from random import shuffle, randint
 from gameobject import GameObject
 from citycard import CityCard
+from city import City
 from epidemic_card import EpidemicCard
 
 
@@ -28,6 +29,12 @@ class Deck(GameObject):
             self.__deck.insert(index, EpidemicCard())
             self.__cards_in_deck += 1
         return
+
+    def city_in_discard_pile(self, city_to_check):
+        for card in self.__discard_pile:
+            if card.has_name(city_to_check.get_name()):
+                return True
+        return False
 
     def discard_card(self, card):
         self.__discard_pile.append(card)

@@ -129,21 +129,22 @@ class City(GameObject):
 
     def dec_cubes(self, colour):
         if self.__cubes[colour] > 0:
-            if self.__game.is_cured(colour):
-                self.__cubes[colour] = 0
-            else:
-                self.__cubes[colour] -= 1
+            self.__cubes[colour] -= 1
             self.__cube_text[colour].setText(str(self.__cubes[colour]))
             self.draw_cubes()
+        return
 
     def inc_cubes(self, colour):
         total_added = 0
+        outbreaks = 0
         if self.__cubes[colour] >= 3:
+            outbreaks += 1
             if not self.__has_outbreaked:
-                self.__game.inc_outbreaks()
                 self.__has_outbreaked = True
                 for city in self.__connected_cities:
-                    total_added += city.inc_cubes(colour)
+                    cubes_added, outbreaks_added = city.inc_cubes(colour)
+                    total_added += cubes_added
+                    outbreaks += outbreaks_added
         else:
             cube_added = self.__game.inc_cubes(colour)
             if cube_added:
@@ -152,7 +153,7 @@ class City(GameObject):
 
         self.__cube_text[colour].setText(str(self.__cubes[colour]))
         self.draw_cubes()
-        return total_added
+        return total_added, outbreaks
 
     def is_clicked(self, mouse_x, mouse_y):
         return ((self.x - mouse_x)**2 + (self.y - mouse_y)**2) <= self.__radius**2
