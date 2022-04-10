@@ -81,7 +81,7 @@ class Game:
         hong_kong = City("Hong Kong", "red", [], self.__window, 740, 210, self)
         bangkok = City("Bangkok", "red", [], self.__window, 740, 270, self)
         jakarta = City("Jakarta", "red", [], self.__window, 730, 340, self)
-        ho_chi_min = City("Ho Chi\nMin City", "red", [], self.__window, 800, 300, self)
+        ho_chi_min = City("Ho Chi Min City", "red", [], self.__window, 800, 300, self)
         sydney = City("Sydney", "red", [], self.__window, 850, 400, self)
         manila = City("Manila", "red", [], self.__window, 850, 270, self)
         taipei = City("Taipei", "red", [], self.__window, 800, 200, self)

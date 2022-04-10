@@ -1,9 +1,18 @@
+from city import City
+
 
 class Game:
 
     all_colours = ['blue', 'yellow', 'black', 'red']
 
+
+
     def __init__(self, colours=all_colours):
+        self.window = None
+        self.colours = colours
+
+
+
         return
 
     # Add get actions
@@ -26,4 +35,5 @@ class Game:
 
     # Add reset
     def reset(self):
-        return
+        state = None
+        return state

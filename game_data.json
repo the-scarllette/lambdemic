@@ -1,0 +1,292 @@
+{
+  "blue": {
+    "Atlanta": [
+      "Chicago",
+      "Washington",
+      "Miami"
+    ],
+    "San Francisco": [
+      "Los Angeles",
+      "Chicago",
+      "Tokyo",
+      "Manila"
+    ],
+    "Chicago": [
+      "Montreal",
+      "Atlanta",
+      "Mexico City",
+      "Los Angeles"
+    ],
+    "Montreal": [
+      "New York",
+      "Washington",
+      "Chicago"
+    ],
+    "Washington": [
+      "Montreal",
+      "New York",
+      "Miami",
+      "Atlanta"
+    ],
+    "New York": [
+      "London",
+      "Madrid",
+      "Washington",
+      "Montreal"
+    ],
+    "London": [
+      "Essen",
+      "Paris",
+      "Madrid",
+      "New York"
+    ],
+    "Essen": [
+      "St Petersburg",
+      "Milan",
+      "Algiers",
+      "Madrid",
+      "London"
+    ],
+    "St Petersburg": [
+      "Moscow",
+      "Istanbul",
+      "Essen"
+    ],
+    "Paris": [
+      "Essen",
+      "Milan",
+      "Algiers",
+      "Madrid",
+      "London"
+    ],
+    "Madrid": [
+      "London",
+      "Paris",
+      "Sao Paulo",
+      "New York",
+      "Algiers"
+    ],
+    "Milan": [
+      "Istanbul",
+      "Paris",
+      "Essen"
+    ]
+  },
+  "yellow": {
+    "Los Angeles": [
+      "San Francisco",
+      "Chicago",
+      "Mexico City",
+      "Sydney"
+    ],
+    "Mexico City": [
+      "Chicago",
+      "Miami",
+      "Bogota",
+      "Lima",
+      "Los Angeles"
+    ],
+    "Miami": [
+      "Washington",
+      "Bogota",
+      "Mexico City",
+      "Atlanta"
+    ],
+    "Lima": [
+      "Mexico City",
+      "Bogota",
+      "Santiago"
+    ],
+    "Bogota": [
+      "Miami",
+      "Sao Paulo",
+      "Buenos Aries",
+      "Lima",
+      "Mexico City"
+    ],
+    "Santiago": [
+      "Lima"
+    ],
+    "Buenos Aries": [
+      "Bogota",
+      "Sao Paulo"
+    ],
+    "Sao Paulo": [
+      "Bogota",
+      "Madrid",
+      "Lagos",
+      "Buenos Aries"
+    ],
+    "Lagos": [
+      "Khartoum",
+      "Kinshasa",
+      "Sao Paulo"
+    ],
+    "Kinshasa": [
+      "Lagos",
+      "Khartoum",
+      "Johannesburg"
+    ],
+    "Johannesburg": [
+      "Kinshasa",
+      "Khartoum"
+    ],
+    "Khartoum": [
+      "Cairo",
+      "Johannesburg",
+      "Kinshasa",
+      "Lagos"
+    ]
+  },
+  "black": {
+    "Algiers": [
+      "Paris",
+      "Istanbul",
+      "Cairo",
+      "Madrid"
+    ],
+    "Cairo": [
+      "Istanbul",
+      "Baghdad",
+      "Riyadh",
+      "Khartoum",
+      "Algiers"
+    ],
+    "Istanbul": [
+      "St Petersburg",
+      "Moscow",
+      "Baghdad",
+      "Cairo",
+      "Algiers",
+      "Milan"
+    ],
+    "Moscow": [
+      "Tehran",
+      "Istanbul",
+      "St Petersburg"
+    ],
+    "Baghdad": [
+      "Tehran",
+      "Karachi",
+      "Riyadh",
+      "Cairo",
+      "Istanbul"
+    ],
+    "Riyadh": [
+      "Baghdad",
+      "Karachi",
+      "Cairo"
+    ],
+    "Tehran": [
+      "Moscow",
+      "Delhi",
+      "Karachi",
+      "Baghdad"
+    ],
+    "Karachi": [
+      "Delhi",
+      "Mumbai",
+      "Riyadh",
+      "Baghdad",
+      "Tehran"
+    ],
+    "Mumbai": [
+      "Delhi",
+      "Chennai",
+      "Karachi"
+    ],
+    "Delhi": [
+      "Kolkata",
+      "Chennai",
+      "Mumbai",
+      "Karachi",
+      "Tehran"
+    ],
+    "Chennai": [
+      "Delhi",
+      "Kolkata",
+      "Bangkok",
+      "Jakarta",
+      "Mumbai"
+    ],
+    "Kolkata": [
+      "Hong Kong",
+      "Bangkok",
+      "Chennai",
+      "Delhi"
+    ]
+  },
+  "red": {
+    "Beijing": [
+      "Seoul",
+      "Shanghai"
+    ],
+    "Shanghai": [
+      "Beijing",
+      "Seoul",
+      "Tokyo",
+      "Taipei",
+      "Hong Kong"
+    ],
+    "Hong Kong": [
+      "Shanghai",
+      "Taipei",
+      "Manila",
+      "Ho Chi Min",
+      "Bangkok",
+      "Kolkata"
+    ],
+    "Bangkok": [
+      "Hong Kong",
+      "Ho Chi Min",
+      "Jakarta",
+      "Chennai",
+      "Kolkata"
+    ],
+    "Jakarta": [
+      "Bangkok",
+      "Ho Chi Min",
+      "Sydney",
+      "Chennai"
+    ],
+    "Ho Chi Min City": [
+      "Hong Kong",
+      "Manila",
+      "Jakarta",
+      "Bangkok"
+    ],
+    "Sydney": [
+      "Jakarta",
+      "Manila",
+      "Los Angeles"
+    ],
+    "Manila": [
+      "Taipei",
+      "San Francisco",
+      "Sydney",
+      "Ho Chi Min",
+      "Hong Kong"
+    ],
+    "Taipei": [
+      "Shanghai",
+      "Osaka",
+      "Manila",
+      "Hong Kong"
+    ],
+    "Osaka": [
+      "Tokyo",
+      "Taipei"
+    ],
+    "Tokyo": [
+      "San Francisco",
+      "Osaka",
+      "Shanghai",
+      "Seoul"
+    ],
+    "Seoul": [
+      "Tokyo",
+      "Shanghai",
+      "Beijing"
+    ]
+  }
+}

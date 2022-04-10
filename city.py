@@ -3,7 +3,7 @@ from graphics import *
 
 class City(GameObject):
 
-    def __init__(self, name, colour, connected_cities, window, x, y, game):
+    def __init__(self, name, colour, connected_cities=[], window=None, x=-1, y=-1, game=None):
         super().__init__(window, x, y)
         self.__name = name
         self.__colour = colour
@@ -58,6 +58,7 @@ class City(GameObject):
 
     def set_connected_cities(self, to_set):
         self.__connected_cities = to_set.copy()
+        return
 
     def set_cubes(self, colour, to_set):
         self.__cubes[colour] = to_set
@@ -65,16 +66,19 @@ class City(GameObject):
 
     def set_left_city(self, to_set):
         self.__left_city = to_set
+        return
 
     def set_right_city(self, to_set):
         self.__right_city = to_set
+        return
 
     def set_has_outbreaked(self, to_set):
         self.__has_outbreaked = to_set
+        return
 
     def set_has_res_station(self, to_set):
         self.__has_res_station = to_set
-        if to_set:
+        if to_set and self.__game is not None:
             self.__game.add_res_station(self)
         else:
             try:
