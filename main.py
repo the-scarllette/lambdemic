@@ -1,67 +1,32 @@
-from game import Game
-from graphics import *
-from dqn.dqn_agent import DQNAgent
-from graphing import graph_local_average
+from game_v2 import Game
+import random as rand
 
-# Initialising Window
-width = 1000
-height = 600
-use_graphics = False
-auto_run = True
-print_results = False
 
-# Add saving network
+def main():
+    print_states = True
+    print_actions = True
 
-window = None
-if use_graphics:
-    window = GraphWin("Pandemicai", width, height)
+    num_episodes = 1000
 
-random_episodes = 500
-training_episodes = 100000
-num_episodes = training_episodes + random_episodes
+    colours = ['blue']
 
-alpha = 0.0000000001
-gamma = 0.99
-epsilon = 0.1
+    env = Game(colours)
+    action_space = env.get_action_shape()
 
-initialise = True
-print_states = False
-print_actions = True
-print_reward = True
+    for _ in range(num_episodes):
+        done = False
+        state = env.reset()
+        if print_states:
+            env.print_current_state()
+        while not done:
+            action = rand.randint(0, action_space - 1)
+            next_state, reward, done, _ = env.step(action, print_actions)
+            state = next_state
+            if print_states:
+                env.print_current_state()
 
-use_target_network = False
-target_update_count = 100
+    return
 
-num_agents = 1
 
-for k in range(num_agents):
-    total_rewards = []
-    for episode in range(num_episodes):
-        print("Run " + str(episode))
-        learn = episode > random_episodes
-
-        game = Game(window, 'DQN', None, use_graphics, auto_run, print_results)
-
-        if episode == 0:
-            # Creating Agent
-            agent = DQNAgent(game, window, game.get_city_by_name('Atlanta'),
-                             alpha=alpha, gamma=gamma, epsilon=epsilon, initialise=initialise,
-                             target_network=use_target_network, target_update_count=target_update_count)
-        else:
-            agent.reset(game)
-        game.add_player(agent)
-
-        # Setting up game
-        game.setup_game()
-
-        if use_graphics:
-            game.draw_game()
-
-        # Running Game
-        total_reward = game.train_agent(print_states, print_actions=print_actions, agent_num=None, learn=learn)
-        if learn:
-            total_rewards.append(total_reward)
-        if print_reward:
-            print("Total Reward: " + str(total_reward))
-    graph_local_average(total_rewards, c=10000)
-
+if __name__ == "__main__":
+    main()

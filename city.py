@@ -80,11 +80,6 @@ class City(GameObject):
         self.__has_res_station = to_set
         if to_set and self.__game is not None:
             self.__game.add_res_station(self)
-        else:
-            try:
-                self.__game.remove_res_station(self)
-            except ValueError:
-                return
         return
 
     def click(self):
@@ -146,10 +141,8 @@ class City(GameObject):
                     total_added += cubes_added
                     outbreaks += outbreaks_added
         else:
-            cube_added = self.__game.inc_cubes(colour)
-            if cube_added:
-                self.__cubes[colour] += 1
-                total_added += 1
+            self.__cubes[colour] += 1
+            total_added += 1
 
         self.__cube_text[colour].setText(str(self.__cubes[colour]))
         self.draw_cubes()

@@ -5,22 +5,23 @@ from graphics import *
 
 class Player(GameObject):
 
-    def __init__(self, name, window=None, city=None, colour=None, draw_offset=None):
+    def __init__(self, name, draw=False, window=None, city=None, colour=None, draw_offset=None):
         self.__colour = colour
         self.__city = city
         self.__name = name
         self.__draw_offset = draw_offset
-        super().__init__(window, self.__city.get_x(), self.__city.get_y())
-        self.__pawn = Circle(Point(self.x + 15 + self.__draw_offset, self.y), 5)
-        self.__pawn.setFill(self.__colour)
+        self.__draw = draw
+        if self.__draw:
+            super().__init__(window, self.__city.get_x(), self.__city.get_y())
+            self.__pawn = Circle(Point(self.x + 15 + self.__draw_offset, self.y), 5)
+            self.__pawn.setFill(self.__colour)
 
-        self.__text = Text(Point(50 + 20*self.__draw_offset, 400), self.__name)
-        self.__click_box = Rectangle(Point(20 + 20*self.__draw_offset, 390), Point(80 + 20*self.__draw_offset, 410))
-        self.__click_box.setFill(colour)
+            self.__text = Text(Point(50 + 20*self.__draw_offset, 400), self.__name)
+            self.__click_box = Rectangle(Point(20 + 20*self.__draw_offset, 390), Point(80 + 20*self.__draw_offset, 410))
+            self.__click_box.setFill(colour)
 
+            self.__hand_image = []
         self.__hand = []
-        self.__hand_image = []
-
         self.__cards_in_hand = 0
         return
 
@@ -46,17 +47,19 @@ class Player(GameObject):
         return self.__name
 
     def get_results_filename(self):
-        return self.__
+        return
 
     def set_city(self, city):
         self.__city = city
 
     def add_to_hand(self, card):
         self.__hand.append(card)
-        text = Text(Point(50 + 20 * self.__draw_offset, 420 + self.__cards_in_hand*15), card.get_name())
-        text.setFill(card.get_colour())
-        self.__hand_image.append(text)
+        if self.__draw:
+            text = Text(Point(50 + 20 * self.__draw_offset, 420 + self.__cards_in_hand*15), card.get_name())
+            text.setFill(card.get_colour())
+            self.__hand_image.append(text)
         self.__cards_in_hand += 1
+        return
     
     def can_cure(self, colour):
         cards_needed = 5
@@ -74,25 +77,16 @@ class Player(GameObject):
         return
 
     def discard_card_by_name(self, card_name):
-        discarded = False
-        i = 0
-        while i < self.__cards_in_hand:
-            if discarded:
-                self.__hand_image[i].move(0, -15)
-            if self.__hand[i].has_name(card_name):
-                self.__hand[i].discard()
-                self.__hand_image[i].undraw()
+        for i in range(self.__cards_in_hand):
+            discarded = self.__hand[i]
+            if discarded.has_name(card_name):
                 del self.__hand[i]
-                del self.__hand_image[i]
                 self.__cards_in_hand -= 1
-                discarded = True
-            else:
-                i += 1
-
-        return discarded
+                return discarded
+        return None
 
     def draw(self):
-        if self.window is None:
+        if not self.__draw:
             return
         self.__pawn.undraw()
         self.__pawn = Circle(Point(self.x + 15 + self.__draw_offset, self.y), 5)

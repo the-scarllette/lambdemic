@@ -27,6 +27,7 @@ class Game:
         self.window = None
         self.colours = colours
         self.player_count = 2
+        self.last_cured = {colour: False for colour in self.colours}
 
         # Defining state space
         self.num_cites = 0
@@ -49,7 +50,8 @@ class Game:
                                  self.treat: {'name': 'treat', 'use_colour': True}}
         self.actions = []
         for function in self.action_functions:
-            to_add = [[function, city_name] for city_name in self.city_names]
+            for colour in self.colours:
+                to_add = [[function, city_name] for city_name in self.city_names[colour]]
             if not self.action_functions[function]['use_colour']:
                 for elm in to_add:
                     elm.append(None)
@@ -68,7 +70,7 @@ class Game:
         self.infection_rate_index = 0
         self.cure_tracker = None
         self.research_stations = None
-        self.num_epidemics = 4
+        self.num_epidemics = len(self.colours)
         self.epidemics_drawn = 0
 
         self.game_finished = True
@@ -77,7 +79,7 @@ class Game:
     def add_cubes(self, city, colour, num_cubes):
         total_added = 0
         outbreaks = 0
-        for _ in num_cubes:
+        for _ in range(num_cubes):
             cubes_to_add, outbreaks_to_add = city.inc_cubes(colour)
             total_added += cubes_to_add
             outbreaks += outbreaks_to_add
@@ -158,7 +160,7 @@ class Game:
             drawn_card = self.player_deck.draw_card()
             if drawn_card is None:
                 return
-            if drawn_card.is_epidemic():
+            if drawn_card.is_epidemic:
                 self.epidemic()
                 continue
             self.players[self.current_turn].add_to_hand(drawn_card)
@@ -180,13 +182,13 @@ class Game:
         connected_cities = []
         for name in connected_names:
             city_to_add = self.get_city_by_name(name)
-            if city_to_add.get_colour in self.colours:
+            if city_to_add is not None:
                 connected_cities.append(city_to_add)
         city.set_connected_cities(connected_cities)
         return
 
     def find_path(self, start_city, end_city, cards_to_use=[]):
-        # uses graph search to find path
+        # Uses graph search to find path
         start_node = PathNode(start_city, 0)
         if start_city.equals(end_city):
             return start_node
@@ -195,6 +197,9 @@ class Game:
         while not path_found:
             current_node = frontier.pop(0)
             cost = current_node.get_cost() + 1
+            if cost > 4:
+                end_node = to_add
+                break
 
             # By moving
             action = 'move'
@@ -210,7 +215,7 @@ class Game:
             # Shuttle flight
             action = 'shuttle'
             if current_node.has_research_station():
-                for city in self.__research_stations:
+                for city in self.research_stations:
                     to_add = PathNode(city, cost, current_node, action)
                     frontier.append(to_add)
                     if to_add.get_city().equals(end_city):
@@ -287,7 +292,7 @@ class Game:
 
             # City card location
             for player in self.players:
-                state[index] = float(player.has_city_in_hand(city))
+                state[index] = float(player.is_city_in_hand(city))
                 index += 1
             state[index] = float(self.player_deck.city_in_discard_pile(city))
             index += 1
@@ -413,7 +418,7 @@ class Game:
         infected_cities = {colour: {i: [city.get_name() for city in self.cities if city.get_cubes(colour) == i]
                                     for i in range(1, 4)} for colour in self.colours}
         print("Infected cities:")
-        for colour in self..colours:
+        for colour in self.colours:
             print(colour)
             for i in range(1, 4):
                 print(str(i) + ": " + str(infected_cities[colour][i]))
@@ -468,7 +473,8 @@ class Game:
             self.fill_connected_cities(city)
 
         # New Player and Infection Deck
-        self.player_deck, self.infection_deck = Deck()
+        self.player_deck = Deck()
+        self.infection_deck = Deck()
         for city in self.cities:
             self.infection_deck.add_card(CityCard(city))
             self.player_deck.add_card(CityCard(city))
@@ -476,6 +482,7 @@ class Game:
         self.player_deck.shuffle()
 
         # Cure tracker
+        self.last_cured = {colour: False for colour in self.colours}
         self.cure_tracker = {colour: False for colour in self.colours}
         # Reset outbreak track
         self.num_outbreaks = 0
@@ -494,10 +501,10 @@ class Game:
         self.add_research_station(start_city)
 
         # New Players
-        self.players = [Player(str(i), start_city) for i in range(self.player_count)]
+        self.players = [Player(str(i), city=start_city) for i in range(self.player_count)]
 
         # New Player hands
-        cards_per_player = (6 - self.__player_count)
+        cards_per_player = (6 - self.player_count)
         for player in self.players:
             for _ in range(cards_per_player):
                 card_to_draw = self.player_deck.draw_card()
@@ -514,7 +521,7 @@ class Game:
         self.cubes = {colour: 0 for colour in self.colours}
         for cubes_to_place in range(1, 4):
             for _ in range(3):
-                city = self.get_city_by_name(self.__infection_deck.draw_and_discard().get_name())
+                city = self.get_city_by_name(self.infection_deck.draw_and_discard().get_name())
                 self.add_cubes(city, city.get_colour(), cubes_to_place)
 
         self.game_finished = False
@@ -526,7 +533,7 @@ class Game:
             city.set_has_outbreaked(False)
         return
 
-    def step(self, action_index):
+    def step(self, action_index, print_action=False):
         if self.game_finished:
             print("Must call reset before invoking step")
 
@@ -537,10 +544,14 @@ class Game:
         colour_used = action[2]
 
         # Taking action
+        print_str = self.action_functions[func]['name'] + " at " + city_name
         if colour_used is None:
             action_successful = func(city_name)
         else:
             action_successful = func(city_name, colour_used)
+            print_str += " with " + colour_used
+        if print_action:
+            print(print_str)
 
         # Transitioning to next State
         self.draw_player_cards()
@@ -555,10 +566,14 @@ class Game:
 
         # Finding reward: +1 for each turn, -10 for loss, +10 for curing a disease
         reward = 1
-        if action == self.cure and action_successful:
-            reward += 10
+        for colour in self.colours:
+            if self.cure_tracker[colour] and not self.last_cured[colour]:
+                reward += 10
         if terminal and not win:
             reward += -10
+        self.game_finished = terminal
+        for colour in self.colours:
+            self.last_cured[colour] = self.cure_tracker[colour]
 
         return next_state, reward, terminal, None
 
