@@ -170,8 +170,10 @@ class Game:
         self.inc_infection_rate()
 
         infection_card = self.infection_deck.draw_bottom_card()
-        infected_city = self.get_city_by_name(infection_card.get_name())
-        self.add_cubes(infected_city, infected_city.get_colour(), 3)
+        if infection_card is not None:
+            self.infection_deck.discard_card(infection_card)
+            infected_city = self.get_city_by_name(infection_card.get_name())
+            self.add_cubes(infected_city, infected_city.get_colour(), 3)
         self.infection_deck.restack_discard_pile()
 
         self.epidemics_drawn += 1
@@ -378,8 +380,9 @@ class Game:
                 self.inc_infection_rate()
                 return
 
+            self.infection_deck.discard_card(infection_card)
             infected_city = self.get_city_by_name(infection_card.get_name())
-            infected_city.inc_cubes(infected_city.get_colour())
+            self.add_cubes(infected_city, infected_city.get_colour(), 1)
         return
 
     def is_terminal(self):
@@ -390,17 +393,20 @@ class Game:
                 all_cured = False
                 break
         if all_cured:
-            return True, True
+            return True, True, 'win'
 
         # Loss if: outbreaks >= 8, more than 24 cubes of a single colour, run out of player cards
-        if self.num_outbreaks >= 8 or self.player_deck.get_number_of_cards() <= 0:
-            return True, False
+        if self.num_outbreaks >= 8:
+            return True, False, 'outbreaks'
+        if len(self.colours) > 1:
+            if self.player_deck.get_number_of_cards() <= 0:
+                return True, False, 'player_cards'
         for colour in self.colours:
             if self.cubes[colour] > 24:
-                return True, False
+                return True, False, 'disease_cubes'
 
         # Otherwise Game is not terminal
-        return False, False
+        return False, False, None
 
     def move_player(self, moving_player, current_node, action_points):
         while action_points > 0 and current_node.get_next_node() is not None:
@@ -562,7 +568,7 @@ class Game:
         next_state = self.get_current_state()
 
         # Finding if state is terminal
-        terminal, win = self.is_terminal()
+        terminal, win, reason = self.is_terminal()
 
         # Finding reward: +1 for each turn, -10 for loss, +10 for curing a disease
         reward = 1
@@ -575,7 +581,8 @@ class Game:
         for colour in self.colours:
             self.last_cured[colour] = self.cure_tracker[colour]
 
-        return next_state, reward, terminal, None
+        info = {'terminal_reason': reason}
+        return next_state, reward, terminal, info
 
     def take(self, city_name):
         city = self.get_city_by_name(city_name)
