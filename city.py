@@ -12,8 +12,6 @@ class City(GameObject):
         self.__left_city = False
         self.__right_city = False
         self.__cubes = {"blue": 0, "yellow": 0, "black": 0, "red": 0}
-        self.__red_cube_text.setSize(15)
-        self.__red_cube_text.setOutline("red")
         self.__has_outbreaked = False
 
     def get_center(self):
