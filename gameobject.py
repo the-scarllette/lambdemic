@@ -1,5 +1,3 @@
-from graphics import *
-
 class GameObject:
 
     def __init__(self, window, x, y):
@@ -16,8 +14,9 @@ class GameObject:
     def set_x(self, x):
         self.x = x
 
-    def set_y(self):
+    def set_y(self, y):
         self.y = y
+        return
 
     def click(self):
         return
