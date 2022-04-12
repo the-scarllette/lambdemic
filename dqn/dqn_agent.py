@@ -4,7 +4,6 @@ import tensorflow as tf
 from tensorflow import keras
 from keras.layers import Dense
 from learningagent import LearningAgent
-from game import Game
 import random as rand
 import numpy as np
 
