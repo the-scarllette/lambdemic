@@ -1,6 +1,5 @@
 from gameobject import GameObject
 from city import City
-from graphics import *
 
 
 class Player(GameObject):
