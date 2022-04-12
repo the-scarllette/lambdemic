@@ -31,7 +31,6 @@ class TDLambdaAgent:
 
         self.net = self.build_neural_net(initialise)
         self.net.summary()
-        input('run?')
         return
 
     def build_neural_net(self, initialise):
