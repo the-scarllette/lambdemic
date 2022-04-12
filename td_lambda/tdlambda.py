@@ -1,4 +1,6 @@
-import numpy as np
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 from tensorflow import keras
 from keras.layers import Dense
 from keras import backend
@@ -9,9 +11,9 @@ import random as rand
 class TDLambdaAgent:
 
     def __init__(self, state_shape, action_shape, initialise=True,
-                 alpha = 0.001, lamb=0.9, epsilon=0.1,
+                 alpha=0.001, lamb=0.9, epsilon=0.1,
                  net_layers=[64, 32, 16], memory_sze=1000000,
-                 experience_replay=False,  batch_size=8):
+                 experience_replay=False, batch_size=8):
 
         self.alpha = alpha
         self.lamb = lamb
