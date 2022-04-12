@@ -125,6 +125,28 @@ class Game:
             return True
         return False
 
+    def can_take_action(self, action_name, city_name, colour):
+        city = self.get_city_by_name(city_name)
+        acting_player = self.players[self.current_turn]
+
+        if action_name == 'build':  # Build: player needs city card in hand and no res station there
+            return (not city.has_research_station()) and acting_player.is_city_in_hand(city)
+        elif action_name == 'cure':  # Cure: player needs 5 or more colour of cards and res station at city
+            return city.has_research_station() and acting_player.can_cure(colour)
+        elif action_name == 'give':  # give: player needs the city card in hand
+            return acting_player.is_city_in_hand(city)
+        elif action_name == 'take':  # take: another player needs to be at the city with the card
+            for i in range(self.player_count):
+                if i == self.current_turn:
+                    continue
+                other_player = self.players[i]
+                if other_player.in_city(city) and other_player.is_city_in_hand(city):
+                    return True
+            return False
+        elif action_name == 'treat':  # treat: city needs to have colour cubes on it
+            return city.get_cubes(colour) > 0
+        return None
+
     def cure(self, city_name, colour):
         city = self.get_city_by_name(city_name)
         acting_player = self.players[self.current_turn]
@@ -188,6 +210,18 @@ class Game:
                 connected_cities.append(city_to_add)
         city.set_connected_cities(connected_cities)
         return
+
+    def find_move_after_state(self, current_node, action_points):
+        after_state = self.get_state_dict()
+        while action_points > 0 and current_node.get_next_node() is not None:
+            current_node = current_node.get_next_node()
+            card_used = current_node.get_used_card()
+            if card_used is not None:
+                after_state['city_cards']['player_hands'][self.current_turn].remove(card_used)
+                after_state['city_cards']['discarded'].append(card_used)
+            action_points -= 1
+        after_state['player_locations'][self.current_turn] = current_node.get_city()
+        return after_state, action_points
 
     def find_path(self, start_city, end_city, cards_to_use=[]):
         # Uses graph search to find path
@@ -259,12 +293,101 @@ class Game:
 
         return prev_node
 
+    def get_actions_and_after_states(self):
+        possible_actions = [i for i in range(self.action_space)
+                            if self.can_take_action(self.action_functions[self.actions[i][0]]['name'],
+                                                    self.actions[i][1],
+                                                    self.actions[i][2])]
+
+        after_states = [self.get_after_state(action) for action in possible_actions]
+        return possible_actions, after_states
+
     def get_action_shape(self):
         return self.action_space
 
-    # Add get after state
-    def get_after_state(self, action):
-        after_state = None
+    def get_after_state(self, action_index):
+        action = self.actions[action_index]
+
+        action_name = self.action_functions[action[0]]['name']
+        city = self.get_city_by_name(action[1])
+        colour = action[2]
+
+        acting_player = self.players[self.current_turn]
+
+        # Getting hand of cards that can be used to move
+        hand = acting_player.get_hand().copy()
+        if action_name in ['build', 'give']:  # Cannot use chosen city card
+            for card in hand:
+                if card.has_city(city):
+                    used_card = card
+                    hand.remove(card)
+                    break
+        elif action_name == 'cure':  # Cannot use cards of chosen colour
+            to_remove = []
+            for card in hand:
+                if card.has_colour(colour):
+                    to_remove.append(card)
+            for card in to_remove:
+                hand.remove(card)
+
+        # Moving Player
+        start_node = self.find_path(acting_player.get_city(), city, hand)
+        action_points = 4
+        after_state, action_points = self.find_move_after_state(start_node, action_points)
+
+        # Performing action
+        if action_points > 0:
+            if action_name == 'build':
+                after_state['research_stations'].append(city)
+                after_state['city_cards']['player_hands'][self.current_turn].remove(used_card)
+                after_state['city_cards']['discarded'].append(used_card)
+            elif action_name == 'cure':
+                after_state['cured_diseases'].append(colour)
+                cards_to_cure = 5
+                while cards_to_cure > 0:
+                    card_to_remove = to_remove.pop()
+                    after_state['city_cards']['player_hands'][self.current_turn].remove(card_to_remove)
+                    after_state['city_cards']['discarded'].append(card_to_remove)
+                    cards_to_cure -= 1
+            elif action_name == 'give':
+                player_index = None
+                for i in range(self.player_count):
+                    if i == self.current_turn:
+                        continue
+                    if self.players[i].in_city(city):
+                        player_index = i
+                        break
+                if player_index is not None:
+                    after_state['city_cards']['player_hands'][self.current_turn].remove(used_card)
+                    after_state['city_cards']['player_hands'][player_index].append(used_card)
+            elif action_name == 'take':
+                player_index = None
+                for i in range(self.player_count):
+                    if player_index is not None:
+                        break
+                    if i == self.current_turn:
+                        continue
+                    for card in self.players[i].get_hand():
+                        if card.has_city(city):
+                            receiving_card = card
+                            player_index = i
+                            break
+                if player_index is not None:
+                    after_state['city_cards']['player_hands'][player_index].remove(receiving_card)
+                    after_state['city_cards']['player_hands'][self.current_turn].append(receiving_card)
+            elif action_name == 'treat':
+                num_cubes = city.get_cubes(colour)
+                if self.cure_tracker[colour]:
+                    new_num_cubes = 0
+                else:
+                    new_num_cubes = num_cubes - action_points
+                after_state['infected_cities'][colour][num_cubes].remove(city)
+                if new_num_cubes > 0:
+                    after_state['infected_cities'][colour][new_num_cubes].append(city)
+
+        # Converting after_state dict into numpy array
+        after_state = self.state_dict_to_state(after_state)
+
         return after_state
 
     def get_city_by_name(self, name):
@@ -326,6 +449,20 @@ class Game:
         for colour in self.colours:
             state[index] = float(self.cure_tracker[colour])
             index += 1
+
+        return state
+
+    def get_state_dict(self):
+        state = {'current_turn': self.current_turn, 'infected_cities': {colour: {i: [city for city in self.cities
+                                                                                     if city.get_cubes(colour) == i]
+                                                                                 for i in range(1, 4)} for colour in
+                                                                        self.colours}, 'outbreaks': self.num_outbreaks,
+                 'research_stations': self.research_stations.copy(),
+                 'player_locations': [player.get_city() for player in self.players],
+                 'city_cards': {'player_hands': [player.get_hand().copy() for player in self.players],
+                                'discarded': self.player_deck.get_discard_pile().copy()},
+                 'infection_cards': self.infection_deck.get_discard_pile().copy(), 'epidemics': self.epidemics_drawn,
+                 'cured_diseases': [colour for colour in self.colours if self.cure_tracker[colour]]}
 
         return state
 
@@ -539,6 +676,79 @@ class Game:
             city.set_has_outbreaked(False)
         return
 
+    def state_dict_to_state(self, state_dict):
+        state = np.zeros(self.state_shape)
+
+        state[state_dict['current_turn']] = 1.0
+        index = self.player_count
+
+        for city in self.cities:
+            # Cubes on cities
+            infected_cities = state_dict['infected_cities']
+            for colour in self.colours:
+                for num_cubes in range(1, 4):
+                    state[index] = float(city in infected_cities[colour][num_cubes])
+                    index += 1
+
+            # Has research station
+            state[index] = float(city in state_dict['research_stations'])
+            index += 1
+
+            # City card locations
+            city_card_found = False
+            city_cards = state_dict['city_cards']
+            for i in range(self.player_count):
+                for card in city_cards['player_hands'][i]:
+                    if city_card_found:
+                        break
+                    if card.has_city(city):
+                        state[index] = 1.0
+                        city_card_found = True
+                        break
+                index += 1
+            if not city_card_found:
+                for card in city_cards['discarded']:
+                    if card.has_city(city):
+                        state[index] = 1.0
+                        break
+            index += 1
+
+            # Infection card in discard pile
+            infection_cards = state_dict['infection_cards']
+            for card in infection_cards:
+                if card.has_city(city):
+                    state[index] = 1.0
+                    break
+            index += 1
+
+            # Has player there
+            for i in range(self.player_count):
+                state[index] = float(city.equals(state_dict['player_locations'][i]))
+                index += 1
+
+        # Number of outbreaks
+        if state_dict['outbreaks'] == 0:
+            value = 0.0
+        else:
+            value = float(state_dict['outbreaks'] / 8)
+        state[index] = value
+        index += 1
+
+        # Epidemics seen
+        if state_dict['epidemics'] == 0:
+            value = 0.0
+        else:
+            value = float(state_dict['epidemics']/ self.num_epidemics)
+        state[index] = value
+        index += 1
+
+        # Cured diseases
+        for colour in self.colours:
+            state[index] = float(colour in state_dict['cured_diseases'])
+            index += 1
+
+        return state
+
     def step(self, action_index, print_action=False):
         if self.game_finished:
             print("Must call reset before invoking step")
@@ -571,17 +781,18 @@ class Game:
         terminal, win, reason = self.is_terminal()
 
         # Finding reward: +1 for each turn, -10 for loss, +10 for curing a disease
-        reward = 1
+        reward = 1.0
         for colour in self.colours:
             if self.cure_tracker[colour] and not self.last_cured[colour]:
-                reward += 10
+                reward += 10.0
         if terminal and not win:
-            reward += -10
+            reward += -10.0
         self.game_finished = terminal
         for colour in self.colours:
             self.last_cured[colour] = self.cure_tracker[colour]
 
-        info = {'terminal_reason': reason}
+        info = {'cured_diseases': [colour for colour in self.colours if self.cure_tracker[colour]],
+                'terminal_reason': reason}
         return next_state, reward, terminal, info
 
     def take(self, city_name):
