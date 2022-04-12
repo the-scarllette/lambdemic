@@ -106,9 +106,6 @@ class City(GameObject):
         else:
             self.__cubes[colour] += 1
             total_added += 1
-
-        self.__cube_text[colour].setText(str(self.__cubes[colour]))
-        self.draw_cubes()
         return total_added, outbreaks
 
     def is_clicked(self, mouse_x, mouse_y):
