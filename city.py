@@ -13,6 +13,8 @@ class City(GameObject):
         self.__right_city = False
         self.__cubes = {"blue": 0, "yellow": 0, "black": 0, "red": 0}
         self.__has_outbreaked = False
+        self.__has_res_station = False
+        return
 
     def get_center(self):
         return self.__center
