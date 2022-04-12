@@ -97,7 +97,7 @@ class DQNAgent(LearningAgent):
     learning_file = 'dqn/dqn_learning_data.json'
     results_file = 'results/dqn_results.json'
 
-    colours = Game.colours
+    colours = ['blue', 'yellow', 'black', 'red']
 
     turn_reward = 1
     cure_reward = 10
