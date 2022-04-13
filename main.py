@@ -165,7 +165,7 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
             agent.set_epsilon(new_epsilon)
 
     if graph_rewards:
-        name = name_prefix + 'td_lambda_agent'
+        name = name_prefix + 'td_lambda_agent ' + str(training_episodes)
         for colour in colours:
             name += ' ' + colour
         if using_epsilon_reduction:
