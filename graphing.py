@@ -55,6 +55,7 @@ def graph_local_average(data, c=10, name=None):
         y.append(current_total / c)
         x.append(i)
 
+    plt.clf()
     plt.plot(x, y)
     plt.xlabel('Run Number')
     if name is not None:
