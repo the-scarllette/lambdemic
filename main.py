@@ -104,9 +104,18 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
 
     using_epsilon_reduction = epsilon_reduction is not None
 
+    name = name_prefix + 'td_lambda_agent ' + str(training_episodes)
+    for colour in colours:
+        name += ' ' + colour
+    if using_epsilon_reduction:
+        name += ' with epsilon reduction'
+    if use_target_network:
+        name += ' with target network'
+
     agent = TDLambdaAgent(state_shape, action_shape, epsilon=epsilon, net_layers=net_layer,
                           experience_replay=random_episodes > 0,
-                          use_target_network=use_target_network)
+                          use_target_network=use_target_network,
+                          check_point_name=name + "_data/cp.ckpt", checkpoint_step=500)
     if using_epsilon_reduction:
         agent.set_epsilon(epsilon)
         new_epsilon = epsilon
@@ -165,13 +174,6 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
             agent.set_epsilon(new_epsilon)
 
     if graph_rewards:
-        name = name_prefix + 'td_lambda_agent ' + str(training_episodes)
-        for colour in colours:
-            name += ' ' + colour
-        if using_epsilon_reduction:
-            name += ' with epsilon reduction'
-        if use_target_network:
-            name += ' with target network'
         graph_local_average(rewards, c=training_episodes / 50, name=name + " return sum")
         graph_cured_diseases(cures, colours, name=name)
         graph_local_average(turns_survived, c=training_episodes / 50, name=(name + " turns survived"))
@@ -184,7 +186,7 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
 
 def main():
     random_episodes = 10000
-    training_episodes = 1000000
+    training_episodes = 100000
 
     possible_colours = [['blue'], ['blue', 'yellow'], ['blue', 'yellow', 'black'],
                         ['blue', 'yellow', 'black', 'red']]

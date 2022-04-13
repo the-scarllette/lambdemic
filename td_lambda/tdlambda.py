@@ -14,7 +14,8 @@ class TDLambdaAgent:
                  alpha=0.000001, lamb=0.5, epsilon=0.1,
                  net_layers=[64, 32, 16], memory_sze=1000000,
                  experience_replay=False, batch_size=4,
-                 use_target_network=False, target_network_step=5,):
+                 use_target_network=False, target_network_step=5,
+                 check_point_name=None, checkpoint_step=500):
         self.num_episodes = 0
 
         self.alpha = alpha
@@ -40,6 +41,14 @@ class TDLambdaAgent:
             self.target_net = self.build_neural_net(initialise)
             self.update_target_net()
             self.target_network_step = target_network_step
+
+        self.checkpoint_path = check_point_name
+        self.checkpoint_step = checkpoint_step
+        if self.checkpoint_path is not None:
+            self.checkpoint_dir = os.path.dirname(self.checkpoint_path)
+            self.cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=self.checkpoint_path,
+                                                                  save_weights_only=True,
+                                                                  verbose=1)
         return
 
     def build_neural_net(self, initialise):
@@ -108,8 +117,13 @@ class TDLambdaAgent:
                 target = tf.convert_to_tensor([[target]])
 
             # TD(0) Update
-            self.net.fit(last_trajectory['state'].reshape(1, self.state_shape),
-                         target.numpy())
+            if self.num_episodes % self.checkpoint_step == 0 and last_trajectory['terminal']:
+                self.net.fit(last_trajectory['state'].reshape(1, self.state_shape),
+                             target.numpy(),
+                             callbacks=[self.cp_callback])
+            else:
+                self.net.fit(last_trajectory['state'].reshape(1, self.state_shape),
+                             target.numpy())
 
             # TD(Lambda) note: here's the good stuff baby
             if num_steps > 1:
