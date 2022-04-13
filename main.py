@@ -172,9 +172,9 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
             name += ' with epsilon reduction'
         if use_target_network:
             name += ' with target network'
-        graph_local_average(rewards, c=training_episodes / 100, name=name + " return sum")
+        graph_local_average(rewards, c=training_episodes / 50, name=name + " return sum")
         graph_cured_diseases(cures, colours, name=name)
-        graph_local_average(turns_survived, c=training_episodes / 100, name=(name + " turns survived"))
+        graph_local_average(turns_survived, c=training_episodes / 50, name=(name + " turns survived"))
 
     if save_trajectory:
         with open(name + '.json', 'w') as file:
@@ -193,7 +193,7 @@ def main():
 
     graph_rewards = True
     print_states = False
-    print_actions = True
+    print_actions = False
 
     for colours in possible_colours:
         for use_target_network in [False, True]:
