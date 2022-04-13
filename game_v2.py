@@ -22,7 +22,8 @@ class Game:
     infection_rate_track = [2, 2, 2, 3, 3, 4, 4]
 
     def __init__(self, colours=all_colours,
-                 player_count=2, num_epidemics=4):
+                 player_count=2, num_epidemics=4, use_research_stations=False):
+        self.use_research_stations = use_research_stations
         self.cubes = None
         self.window = None
         self.colours = colours
@@ -39,25 +40,31 @@ class Game:
             for city_name in self.game_data[colour]:
                 self.city_names[colour].append(city_name)
         num_colours = len(self.colours)
-        self.state_shape = (self.num_cites * ((3 * num_colours) + (2 * self.player_count) + 3)) + \
+        self.state_shape = (self.num_cites * ((3 * num_colours) + (2 * self.player_count) + 2)) + \
                            (num_colours + player_count + 2)
+        if self.use_research_stations:
+            self.state_shape += self.num_cites
 
         # Defining Action space
-        self.action_functions = {self.build: {'name': 'build', 'use_colour': False},
-                                 self.cure: {'name': 'cure', 'use_colour': True},
+        self.action_functions = {self.cure: {'name': 'cure', 'use_colour': True},
                                  self.give: {'name': 'give', 'use_colour': False},
                                  self.take: {'name': 'take', 'use_colour': False},
                                  self.treat: {'name': 'treat', 'use_colour': True}}
+        if self.use_research_stations:
+            self.action_functions[self.build] = {'name': 'build', 'use_colour': False}
         self.actions = []
         for function in self.action_functions:
-            for colour in self.colours:
-                to_add = [[function, city_name] for city_name in self.city_names[colour]]
-            if not self.action_functions[function]['use_colour']:
-                for elm in to_add:
-                    elm.append(None)
+            if self.action_functions[function]['name'] == 'cure':
+                to_add = [[function, None, colour] for colour in self.colours]
             else:
-                new_to_add = [elm + [colour] for elm in to_add for colour in self.colours]
-                to_add = new_to_add
+                for colour in self.colours:
+                    to_add = [[function, city_name] for city_name in self.city_names[colour]]
+                if not self.action_functions[function]['use_colour']:
+                    for elm in to_add:
+                        elm.append(None)
+                else:
+                    new_to_add = [elm + [colour] for elm in to_add for colour in self.colours]
+                    to_add = new_to_add
             self.actions += to_add
         self.action_space = len(self.actions)
 
@@ -126,13 +133,14 @@ class Game:
         return False
 
     def can_take_action(self, action_name, city_name, colour):
-        city = self.get_city_by_name(city_name)
+        if city_name is not None:
+            city = self.get_city_by_name(city_name)
         acting_player = self.players[self.current_turn]
 
         if action_name == 'build':  # Build: player needs city card in hand and no res station there
             return (not city.has_research_station()) and acting_player.is_city_in_hand(city)
         elif action_name == 'cure':  # Cure: player needs 5 or more colour of cards and res station at city
-            return city.has_research_station() and acting_player.can_cure(colour)
+            return acting_player.can_cure(colour)
         elif action_name == 'give':  # give: player needs the city card in hand
             return acting_player.is_city_in_hand(city)
         elif action_name == 'take':  # take: another player needs to be at the city with the card
@@ -147,6 +155,28 @@ class Game:
             return city.get_cubes(colour) > 0
         return None
 
+    def cure(self, colour):
+        acting_player = self.players[self.current_turn]
+        hand = acting_player.get_hand().copy()
+
+        # Getting cards to use to cure
+        to_remove = []
+        for card in hand:
+            if card.has_colour(colour):
+                to_remove.append(card)
+        can_cure = len(to_remove) >= 5
+
+        # Curing disease if possible
+        if not can_cure or self.cure_tracker[colour]:
+            return False
+        for _ in range(5):
+            card_to_remove = to_remove.pop()
+            acting_player.discard_card_by_name(card_to_remove.get_name())
+            self.player_deck.discard_card(card_to_remove)
+        self.cure_tracker[colour] = True
+        return True
+
+    '''
     def cure(self, city_name, colour):
         city = self.get_city_by_name(city_name)
         acting_player = self.players[self.current_turn]
@@ -176,6 +206,7 @@ class Game:
             self.player_deck.discard_card(card_to_remove)
         self.cure_tracker[colour] = True
         return True
+    '''
 
     def draw_player_cards(self):
         for _ in range(2):
@@ -300,6 +331,16 @@ class Game:
                                                     self.actions[i][2])]
 
         after_states = [self.get_after_state(action) for action in possible_actions]
+
+        num_possible_actions = len(possible_actions)
+        i = 0
+        while i < num_possible_actions:
+            if after_states[i] is None:
+                del possible_actions[i]
+                del after_states[i]
+                num_possible_actions -= 1
+                continue
+            i += 1
         return possible_actions, after_states
 
     def get_action_shape(self):
@@ -309,7 +350,8 @@ class Game:
         action = self.actions[action_index]
 
         action_name = self.action_functions[action[0]]['name']
-        city = self.get_city_by_name(action[1])
+        if action_name[1] is not None:
+            city = self.get_city_by_name(action[1])
         colour = action[2]
 
         acting_player = self.players[self.current_turn]
@@ -331,8 +373,12 @@ class Game:
                 hand.remove(card)
 
         # Moving Player
-        start_node = self.find_path(acting_player.get_city(), city, hand)
         action_points = 4
+        if not action_name == 'cure':
+            start_node = self.find_path(acting_player.get_city(), city, hand)
+        else:
+            player_city = acting_player.get_city()
+            start_node = self.find_path(player_city, player_city , hand)
         after_state, action_points = self.find_move_after_state(start_node, action_points)
 
         # Performing action
@@ -384,6 +430,8 @@ class Game:
                 after_state['infected_cities'][colour][num_cubes].remove(city)
                 if new_num_cubes > 0:
                     after_state['infected_cities'][colour][new_num_cubes].append(city)
+        else:  # If action points are 0 or less player cannot move to space in time to perform action so return None
+            return None
 
         # Converting after_state dict into numpy array
         after_state = self.state_dict_to_state(after_state)
@@ -411,9 +459,10 @@ class Game:
                         state[index] = 1.0
                     index += 1
 
-            # Has research station
-            state[index] = float(city.has_research_station())
-            index += 1
+            if self.use_research_stations:
+                # Has research station
+                state[index] = float(city.has_research_station())
+                index += 1
 
             # City card location
             for player in self.players:
@@ -566,15 +615,21 @@ class Game:
             for i in range(1, 4):
                 print(str(i) + ": " + str(infected_cities[colour][i]))
 
+        # Number of cubes
+        print('cube count')
+        for colour in self.colours:
+            print(colour + " cubes: " + str(self.cubes[colour]))
+
         # Outbreaks
         print("Outbreaks\n" + str(self.num_outbreaks))
 
-        # Research stations
-        print("Research stations")
-        res_str = ""
-        for city in self.research_stations:
-            res_str += (city.get_name() + " ")
-        print(res_str)
+        if self.use_research_stations:
+            # Research stations
+            print("Research stations")
+            res_str = ""
+            for city in self.research_stations:
+                res_str += (city.get_name() + " ")
+            print(res_str)
 
         # Player locations
         print("Player locations")
@@ -641,7 +696,8 @@ class Game:
                 start_city_name = Game.starting_cities[colour]
                 break
         start_city = self.get_city_by_name(start_city_name)
-        self.add_research_station(start_city)
+        if self.use_research_stations:
+            self.add_research_station(start_city)
 
         # New Players
         self.players = [Player(str(i), city=start_city) for i in range(self.player_count)]
@@ -690,9 +746,10 @@ class Game:
                     state[index] = float(city in infected_cities[colour][num_cubes])
                     index += 1
 
-            # Has research station
-            state[index] = float(city in state_dict['research_stations'])
-            index += 1
+            if self.use_research_stations:
+                # Has research station
+                state[index] = float(city in state_dict['research_stations'])
+                index += 1
 
             # City card locations
             city_card_found = False
@@ -760,11 +817,16 @@ class Game:
         colour_used = action[2]
 
         # Taking action
-        print_str = self.action_functions[func]['name'] + " at " + city_name
+        print_str = self.action_functions[func]['name']
+        if city_name is not None:
+            print_str += " at " + city_name
         if colour_used is None:
             action_successful = func(city_name)
         else:
-            action_successful = func(city_name, colour_used)
+            if city_name is not None:
+                action_successful = func(city_name, colour_used)
+            else:
+                action_successful = func(colour_used)
             print_str += " with " + colour_used
         if print_action:
             print(print_str)
@@ -836,7 +898,10 @@ class Game:
         if city.get_cubes(colour) <= 0 or action_points <= 0 or not acting_player.in_city(city):
             return False
         new_cubes = city.get_cubes(colour) - action_points
+        cubes_removed = action_points
         if new_cubes < 0 or self.cure_tracker[colour]:
+            cubes_removed = city.get_cubes(colour)
             new_cubes = 0
+        self.cubes[colour] -= cubes_removed
         city.set_cubes(colour, new_cubes)
         return True

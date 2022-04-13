@@ -11,9 +11,11 @@ import random as rand
 class TDLambdaAgent:
 
     def __init__(self, state_shape, action_shape, initialise=True,
-                 alpha=0.001, lamb=0.9, epsilon=0.1,
+                 alpha=0.000001, lamb=0.5, epsilon=0.1,
                  net_layers=[64, 32, 16], memory_sze=1000000,
-                 experience_replay=False, batch_size=8):
+                 experience_replay=False, batch_size=4,
+                 use_target_network=False, target_network_step=5,):
+        self.num_episodes = 0
 
         self.alpha = alpha
         self.lamb = lamb
@@ -33,6 +35,11 @@ class TDLambdaAgent:
 
         self.net = self.build_neural_net(initialise)
         self.net.summary()
+        self.use_target_net = use_target_network
+        if self.use_target_net:
+            self.target_net = self.build_neural_net(initialise)
+            self.update_target_net()
+            self.target_network_step = target_network_step
         return
 
     def build_neural_net(self, initialise):
@@ -58,6 +65,10 @@ class TDLambdaAgent:
         return net
 
     def choose_action(self, possible_actions, possible_after_states, random_action=False):
+        # If can't take any action whatsoever takes a fully random action
+        if len(possible_actions) <= 0:
+            return rand.randint(0, self.action_state - 1)
+
         # Taking random action
         if random_action or rand.uniform(0, 1) <= self.epsilon:
             return rand.choice(possible_actions)
@@ -81,13 +92,18 @@ class TDLambdaAgent:
         else:
             episodes = [self.current_episode]
 
+        if self.use_target_net:
+            target_net = self.target_net
+        else:
+            target_net = self.net
+
         for episode in episodes:
             num_steps = len(episode)
 
             last_trajectory = episode[-1]
             target = last_trajectory['reward']
             if not last_trajectory['terminal']:
-                target += self.net(last_trajectory['next_state'].reshape(1, self.state_shape))
+                target += target_net(last_trajectory['next_state'].reshape(1, self.state_shape))
             else:
                 target = tf.convert_to_tensor([[target]])
 
@@ -97,7 +113,7 @@ class TDLambdaAgent:
 
             # TD(Lambda) note: here's the good stuff baby
             if num_steps > 1:
-                target = target - self.net(last_trajectory['state'].reshape(1, self.state_shape))
+                target = target - target_net(last_trajectory['state'].reshape(1, self.state_shape))
                 current_learning_rate = self.alpha
                 t = num_steps - 2
                 while t >= 0:
@@ -115,9 +131,13 @@ class TDLambdaAgent:
         if len(self.current_episode) > 0:
             self.memory.append(self.current_episode.copy())
         self.current_episode = []
+        self.num_episodes += 1
 
         if len(self.memory) > self.memory_size:
-            del self.memory[0]
+            del self.memory[rand.randint(0, self.memory_size)]
+
+        if self.use_target_net and self.num_episodes % self.target_network_step == 0:
+            self.update_target_net()
         return
 
     def save_trajectory(self, state, action, reward, next_state, terminal):
@@ -132,4 +152,9 @@ class TDLambdaAgent:
 
     def set_epsilon(self, new_value):
         self.epsilon = new_value
+        return
+
+    def update_target_net(self):
+        self.target_net.set_weights(self.net.get_weights())
+        print("Updated Target Net")
         return

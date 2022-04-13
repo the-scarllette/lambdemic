@@ -2,6 +2,8 @@ from game_v2 import Game
 from graphing import graph_local_average, graph_cured_diseases
 from dqn.dqn_agent import DQNAgent
 from td_lambda.tdlambda import TDLambdaAgent
+import random as rand
+import json
 
 
 def run_dqn(random_episodes, training_episodes, colours, graph_rewards, print_states, print_actions):
@@ -44,20 +46,67 @@ def run_dqn(random_episodes, training_episodes, colours, graph_rewards, print_st
         print("End game because " + info['terminal_reason'])
 
     if graph_rewards:
-        graph_local_average(rewards, c=training_episodes/25)
+        graph_local_average(rewards, c=training_episodes / 25)
+    return
+
+
+def run_random(num_episodes, colours, graph_rewards, print_states, print_actions):
+    env = Game(colours)
+    action_shape = env.get_action_shape()
+
+    rewards = []
+    cures = []
+    turns_survived = []
+
+    for _ in range(num_episodes):
+        done = False
+        state = env.reset()
+        if print_states:
+            env.print_current_state()
+        steps = 0
+        total_reward = 0
+        while not done:
+            action = rand.randint(0, action_shape - 1)
+
+            next_state, reward, done, info = env.step(action, print_actions)
+            if print_states:
+                env.print_current_state()
+
+            state = next_state
+            total_reward += reward
+            steps += 1
+        rewards.append(total_reward)
+        cures.append(info['cured_diseases'])
+        turns_survived.append(steps)
+
+        print("Episode finished, total reward: " + str(total_reward))
+        print("Turns survived: " + str(steps))
+        print("End game because " + info['terminal_reason'])
+
+    if graph_rewards:
+        name = 'random agent'
+        for colour in colours:
+            name += ' ' + colour
+        graph_local_average(rewards, c=num_episodes / 100, name=name + " return sum")
+        graph_cured_diseases(cures, colours, name=name)
+        graph_local_average(turns_survived, c=num_episodes / 100, name=(name + " turns survived"))
     return
 
 
 def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, print_states, print_actions,
-                  epsilon=None, epsilon_reduction=None):
+                  net_layer, epsilon=None, epsilon_reduction=None,
+                  use_target_network=False,
+                  name_prefix='',
+                  save_trajectory=False):
     env = Game(colours)
     action_shape = env.get_action_shape()
     state_shape = env.get_state_shape()
 
-    using_epsilon_reduction = epsilon is not None
+    using_epsilon_reduction = epsilon_reduction is not None
 
-    agent = TDLambdaAgent(state_shape, action_shape, epsilon=epsilon,
-                          experience_replay=True)
+    agent = TDLambdaAgent(state_shape, action_shape, epsilon=epsilon, net_layers=net_layer,
+                          experience_replay=random_episodes > 0,
+                          use_target_network=use_target_network)
     if using_epsilon_reduction:
         agent.set_epsilon(epsilon)
         new_epsilon = epsilon
@@ -65,6 +114,8 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
     num_episodes = random_episodes + training_episodes
     rewards = []
     cures = []
+    turns_survived = []
+    trajectory_data = {}
 
     for episode in range(num_episodes):
         learn = episode >= random_episodes
@@ -75,11 +126,21 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
         total_reward = 0
         if print_states:
             env.print_current_state()
+        steps = 0
+        if learn:
+            trajectory_data[episode - random_episodes] = []
         while not done:
             possible_actions, possible_after_states = env.get_actions_and_after_states()
             action = agent.choose_action(possible_actions, possible_after_states, not learn)
 
             next_state, reward, done, info = env.step(action, print_actions)
+            if learn:
+                trajectory_data[episode - random_episodes].append({'state': state.tolist(),
+                                                 'action': action,
+                                                 'reward': reward,
+                                                 'next_state': next_state.tolist(),
+                                                 'terminal': done})
+
             if print_states:
                 env.print_current_state()
 
@@ -89,11 +150,14 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
                 agent.learn()
             state = next_state
             total_reward += reward
+            steps += 1
 
         if learn:
             rewards.append(total_reward)
             cures.append(info['cured_diseases'])
+            turns_survived.append(steps)
         print("Episode finished, total reward: " + str(total_reward))
+        print("Turns survived: " + str(steps))
         print("End game because " + info['terminal_reason'])
 
         if using_epsilon_reduction:
@@ -101,27 +165,45 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
             agent.set_epsilon(new_epsilon)
 
     if graph_rewards:
-        graph_local_average(rewards, c=training_episodes/25, name='td_lambda_agent')
-        graph_cured_diseases(cures, colours)
+        name = name_prefix + 'td_lambda_agent'
+        for colour in colours:
+            name += ' ' + colour
+        if using_epsilon_reduction:
+            name += ' with epsilon reduction'
+        if use_target_network:
+            name += ' with target network'
+        graph_local_average(rewards, c=training_episodes / 100, name=name + " return sum")
+        graph_cured_diseases(cures, colours, name=name)
+        graph_local_average(turns_survived, c=training_episodes / 100, name=(name + " turns survived"))
+
+    if save_trajectory:
+        with open(name + '.json', 'w') as file:
+            json.dump(trajectory_data, file)
     return
 
 
 def main():
-    random_episodes = 100
-    training_episodes = 3000
+    random_episodes = 10000
+    training_episodes = 10000
 
-    epsilon_start = 0.9
-    epsilon_reduction = 0.999
+    possible_colours = [['blue'], ['blue', 'yellow'], ['blue', 'yellow', 'black'],
+                        ['blue', 'yellow', 'black', 'red']]
 
-    colours = ['blue']
+    net_layer = [64, 32, 16]
 
     graph_rewards = True
     print_states = False
     print_actions = True
 
-    run_td_lambda(random_episodes, training_episodes, colours,
-                  graph_rewards, print_states, print_actions,
-                  epsilon_start, epsilon_reduction)
+    for colours in possible_colours:
+        for use_target_network in [False, True]:
+            run_td_lambda(random_episodes, training_episodes, colours,
+                          graph_rewards, print_states, print_actions,
+                          net_layer=net_layer, epsilon=0.1, epsilon_reduction=None,
+                          use_target_network=use_target_network,
+                          name_prefix=str(net_layer),
+                          save_trajectory=True)
+
     return
 
 

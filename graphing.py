@@ -1,25 +1,41 @@
 import matplotlib.pyplot as plt
+from itertools import chain, combinations
 
 
-def graph_cured_diseases(data, all_colours):
-    labels = ['None'] + all_colours
-    sizes_dict = {label: 0 for label in labels}
+def powerset(iterable):
+    s = list(iterable)
+    return list(chain.from_iterable(combinations(s, r) for r in range(len(s)+1)))
+
+
+def graph_cured_diseases(data, all_colours, name):
+    s = powerset(all_colours)
+    labels = [[sub_elm for sub_elm in elm] for elm in s]
+    labels[0] = ['None']
+
+    sizes = [0 for _ in labels]
 
     for elm in data:
         if len(elm) <= 0:
-            sizes_dict['None'] += 1
+            sizes[0] += 1
             continue
-        for colour in elm:
-            sizes_dict[colour] += 1
+        for i in range(1, len(labels)):
+            if elm == labels[i]:
+                sizes[i] += 1
+                break
 
-    sizes = [sizes_dict[label] for label in labels]
+    labels_str = []
+    for elm in labels:
+        label_str = ""
+        for x in elm:
+            label_str += x
+        labels_str.append(label_str)
 
     fig1, ax1 = plt.subplots()
-    ax1.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
+    ax1.pie(sizes, labels=labels_str, autopct='%1.1f%%', startangle=90)
     ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
 
-    plt.title('TD(Lambda) total runs ' + str(len(data)))
-    plt.show()
+    plt.title(name + ' total runs ' + str(len(data)))
+    plt.savefig(name + ".png")
     return
 
 
@@ -40,9 +56,8 @@ def graph_local_average(data, c=10, name=None):
         x.append(i)
 
     plt.plot(x, y)
-    plt.ylabel('Total Episode Reward')
     plt.xlabel('Run Number')
     if name is not None:
         plt.title(name)
-    plt.show()
+    plt.savefig(name + ".png")
     return
