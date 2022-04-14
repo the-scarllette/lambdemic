@@ -186,7 +186,7 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
 
 def main():
     random_episodes = 10000
-    training_episodes = 100000
+    training_episodes = 10000
 
     possible_colours = [['blue'], ['blue', 'yellow'], ['blue', 'yellow', 'black'],
                         ['blue', 'yellow', 'black', 'red']]
