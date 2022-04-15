@@ -145,10 +145,10 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
             next_state, reward, done, info = env.step(action, print_actions)
             if learn:
                 trajectory_data[episode - random_episodes].append({'state': state.tolist(),
-                                                 'action': action,
-                                                 'reward': reward,
-                                                 'next_state': next_state.tolist(),
-                                                 'terminal': done})
+                                                                   'action': action,
+                                                                   'reward': reward,
+                                                                   'next_state': next_state.tolist(),
+                                                                   'terminal': done})
 
             if print_states:
                 env.print_current_state()
@@ -186,25 +186,24 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
 
 def main():
     random_episodes = 10000
-    training_episodes = 5000
+    training_episodes = 1000
 
-    possible_colours = [['blue'], ['blue', 'yellow'], ['blue', 'yellow', 'black'],
-                        ['blue', 'yellow', 'black', 'red']]
+    possible_colours = [['blue', 'yellow', 'black', 'red']]
 
     net_layer = [64, 32, 16]
+    use_target_network = False
 
     graph_rewards = True
     print_states = False
     print_actions = False
 
     for colours in possible_colours:
-        for use_target_network in [False, True]:
-            run_td_lambda(random_episodes, training_episodes, colours,
-                          graph_rewards, print_states, print_actions,
-                          net_layer=net_layer, epsilon=0.1, epsilon_reduction=None,
-                          use_target_network=use_target_network,
-                          name_prefix=str(net_layer),
-                          save_trajectory=True)
+        run_td_lambda(random_episodes, training_episodes, colours,
+                      graph_rewards, print_states, print_actions,
+                      net_layer=net_layer, epsilon=0.1, epsilon_reduction=None,
+                      use_target_network=use_target_network,
+                      name_prefix=str(net_layer),
+                      save_trajectory=True)
 
     return
 
