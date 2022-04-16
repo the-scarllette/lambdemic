@@ -1,5 +1,5 @@
 from game_v2 import Game
-from graphing import graph_local_average, graph_cured_diseases
+# from graphing import graph_local_average, graph_cured_diseases
 from dqn.dqn_agent import DQNAgent
 from td_lambda.tdlambda import TDLambdaAgent
 import random as rand
