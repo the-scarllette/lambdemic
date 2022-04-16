@@ -192,7 +192,7 @@ def main():
     net_layer = [64, 32, 16]
     use_target_network = False
 
-    graph_rewards = True
+    graph_rewards = False
     print_states = False
     print_actions = False
 
