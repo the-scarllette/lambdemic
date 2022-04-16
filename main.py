@@ -188,7 +188,7 @@ def main():
     random_episodes = 3000
     training_episodes = 5000
 
-    possible_colours = [['blue', 'yellow', 'black', 'red']]
+    possible_colours = [['blue', 'yellow', 'black']]
 
     net_layer = [64, 32, 16]
     use_target_network = False
