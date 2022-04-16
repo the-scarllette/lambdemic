@@ -1,5 +1,5 @@
 from game_v2 import Game
-# from graphing import graph_local_average, graph_cured_diseases
+from graphing import graph_local_average, graph_cured_diseases
 from dqn.dqn_agent import DQNAgent
 from td_lambda.tdlambda import TDLambdaAgent
 import random as rand
@@ -192,9 +192,9 @@ def main():
     net_layer = [64, 32, 16]
     use_target_network = False
 
-    graph_rewards = False
+    graph_rewards = True
     print_states = False
-    print_actions = False
+    print_actions = True
 
     for colours in possible_colours:
         run_td_lambda(random_episodes, training_episodes, colours,
