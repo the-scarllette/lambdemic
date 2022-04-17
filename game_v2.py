@@ -15,7 +15,7 @@ class Game:
 
     all_colours = ['blue', 'yellow', 'black', 'red']
 
-    game_data_path = '/app/game_data.json'
+    game_data_path = 'game_data.json'
 
     actions = {}
 

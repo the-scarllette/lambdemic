@@ -185,7 +185,7 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
 
 
 def main():
-    random_episodes = 0
+    random_episodes = 5000
     training_episodes = 5000
     possible_colours = [['blue', 'yellow', 'black', 'red']]
 
@@ -194,12 +194,12 @@ def main():
 
     graph_rewards = True
     print_states = False
-    print_actions = True
+    print_actions = False
 
     for colours in possible_colours:
         run_td_lambda(random_episodes, training_episodes, colours,
                       graph_rewards, print_states, print_actions,
-                      net_layer=net_layer, epsilon=0.0, epsilon_reduction=None,
+                      net_layer=net_layer, epsilon=0.1, epsilon_reduction=None,
                       use_target_network=use_target_network,
                       name_prefix=str(net_layer),
                       save_trajectory=True)
