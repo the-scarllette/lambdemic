@@ -55,6 +55,14 @@ class Deck(GameObject):
         self.__cards_in_deck -= 1
         card = self.__deck.pop(self.__cards_in_deck)
         return card
+
+    def get_card_by_name(self, name):
+        for i in range(self.__cards_in_deck):
+            card = self.__deck[i]
+            if card.has_name(name):
+                self.__cards_in_deck -= 1
+                return self.__deck.pop(i)
+        return None
     
     def get_discard_pile(self):
         return self.__discard_pile

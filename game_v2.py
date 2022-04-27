@@ -208,21 +208,45 @@ class Game:
         return True
     '''
 
-    def draw_player_cards(self):
+    def draw_player_cards(self, specify_cards=False):
         for _ in range(2):
-            drawn_card = self.player_deck.draw_card()
+            if not specify_cards:
+                drawn_card = self.player_deck.draw_card()
+            else:
+                card_found = False
+                while not card_found:
+                    name = input("Enter card to draw or type 'empty' to indicate empty player deck")
+                    if name == 'empty':
+                        drawn_card = None
+                        break
+                    drawn_card = self.player_deck.get_card_by_name(name)
+                    card_found = drawn_card is not None
+
             if drawn_card is None:
                 return
             if drawn_card.is_epidemic:
-                self.epidemic()
+                self.epidemic(specify_cards)
                 continue
             self.players[self.current_turn].add_to_hand(drawn_card)
         return
 
-    def epidemic(self):
+    def epidemic(self, specify_card=False):
         self.inc_infection_rate()
 
-        infection_card = self.infection_deck.draw_bottom_card()
+        if not specify_card:
+            infection_card = self.infection_deck.draw_bottom_card()
+        else:
+            card_found = False
+            while not card_found:
+                name = input("Enter name of city to infect or 'empty' to indicate an empty deck:\n")
+
+                if name == 'empty':
+                    infection_card = None
+                    break
+
+                infection_card = self.infection_deck.get_card_by_name(name)
+                card_found = infection_card is not None
+
         if infection_card is not None:
             self.infection_deck.discard_card(infection_card)
             infected_city = self.get_city_by_name(infection_card.get_name())
@@ -346,6 +370,12 @@ class Game:
     def get_action_shape(self):
         return self.action_space
 
+    def get_action_type(self, action_index):
+        action = self.actions[action_index]
+        func = action[0]
+
+        return self.action_functions[func]['name']
+
     def get_after_state(self, action_index):
         action = self.actions[action_index]
 
@@ -437,6 +467,20 @@ class Game:
         after_state = self.state_dict_to_state(after_state)
 
         return after_state
+
+    def get_action_string(self, action_index):
+        # Finding action
+        action = self.actions[action_index]
+        func = action[0]
+        city_name = action[1]
+        colour_used = action[2]
+
+        print_str = self.action_functions[func]['name']
+        if city_name is not None:
+            print_str += " at " + city_name
+        if colour_used is not None:
+            print_str += " with " + colour_used
+        return print_str
 
     def get_city_by_name(self, name):
         for city in self.cities:
@@ -554,13 +598,26 @@ class Game:
             self.infection_rate_index += 1
         return
 
-    def infect_cities(self):
+    def infect_cities(self, specify_card=False):
         for _ in range(Game.infection_rate_track[self.infection_rate_index]):
             self.set_cities_to_no_outbreaks()
 
-            infection_card = self.infection_deck.draw_card()
+            if not specify_card:
+                infection_card = self.infection_deck.draw_card()
+            else:
+                card_found = False
+                while not card_found:
+                    name = input("Enter name of city to infect or 'empty' to indicate an empty deck:\n")
 
-            # If out of infection cards, increases the infection rate and restacks the deck
+                    if name == 'empty':
+                        card_found = True
+                        infection_card = None
+                        break
+
+                    infection_card = self.infection_deck.get_card_by_name(name)
+                    card_found = infection_card is not None
+
+            # If out of infection cards, increases the infection rate and restack the deck
             if infection_card is None:
                 self.infection_deck.restack_discard_pile()
                 self.inc_infection_rate()
@@ -584,9 +641,11 @@ class Game:
         # Loss if: outbreaks >= 8, more than 24 cubes of a single colour, run out of player cards
         if self.num_outbreaks >= 8:
             return True, False, 'outbreaks'
+        '''
         if len(self.colours) > 1:
             if self.player_deck.get_number_of_cards() <= 0:
                 return True, False, 'player_cards'
+        '''
         for colour in self.colours:
             if self.cubes[colour] > 24:
                 return True, False, 'disease_cubes'
@@ -661,7 +720,7 @@ class Game:
                 print(colour)
         return
 
-    def reset(self):
+    def reset(self, specify_sate=False):
         # New Cities
         self.cities = []
         for colour in self.colours:
@@ -704,10 +763,19 @@ class Game:
 
         # New Player hands
         cards_per_player = (6 - self.player_count)
-        for player in self.players:
-            for _ in range(cards_per_player):
-                card_to_draw = self.player_deck.draw_card()
-                player.add_to_hand(card_to_draw)
+        if not specify_sate:
+            for player in self.players:
+                for _ in range(cards_per_player):
+                    card_to_draw = self.player_deck.draw_card()
+                    player.add_to_hand(card_to_draw)
+        else:
+            for player in self.players:
+                for _ in range(cards_per_player):
+                    card_to_draw = None
+                    while card_to_draw is None:
+                        name = input("Choose a card to give to " + player.get_name() + " :\n")
+                        card_to_draw = self.player_deck.get_card_by_name(name)
+                    player.add_to_hand(card_to_draw)
 
         # New Current turn
         self.current_turn = 0
@@ -720,7 +788,16 @@ class Game:
         self.cubes = {colour: 0 for colour in self.colours}
         for cubes_to_place in range(1, 4):
             for _ in range(3):
-                city = self.get_city_by_name(self.infection_deck.draw_and_discard().get_name())
+                if not specify_sate:
+                    city_name = self.infection_deck.draw_and_discard().get_name()
+                else:
+                    city_card = None
+                    while city_card is None:
+                        city_name = input("Choose a city to infect with " + str(cubes_to_place) + " cubes:\n")
+                        city_card = self.infection_deck.get_card_by_name(city_name)
+                    self.infection_deck.discard_card(city_card)
+
+                city = self.get_city_by_name(city_name)
                 self.add_cubes(city, city.get_colour(), cubes_to_place)
 
         self.game_finished = False
@@ -806,7 +883,7 @@ class Game:
 
         return state
 
-    def step(self, action_index, print_action=False):
+    def step(self, action_index, print_action=False, specify_state=False):
         if self.game_finished:
             print("Must call reset before invoking step")
 
@@ -832,8 +909,8 @@ class Game:
             print(print_str)
 
         # Transitioning to next State
-        self.draw_player_cards()
-        self.infect_cities()
+        self.draw_player_cards(specify_state)
+        self.infect_cities(specify_state)
         self.current_turn = (self.current_turn + 1) % self.player_count
 
         # Finding next state
