@@ -60,19 +60,19 @@ class TDLambdaAgent:
         net = keras.Sequential()
         init = tf.keras.initializers.HeUniform()
         net.add(Dense(units=self.net_layers[0],
-                          activation='relu',
-                          input_dim=self.state_shape,
-                          use_bias=False,
-                          kernel_initializer=init))
+                      activation='relu',
+                      input_dim=self.state_shape,
+                      use_bias=False,
+                      kernel_initializer=init))
         for i in range(1, self.num_net_layers):
             net.add(Dense(units=self.net_layers[i],
-                              activation='relu',
-                              use_bias=False,
-                              kernel_initializer=init))
+                          activation='relu',
+                          use_bias=False,
+                          kernel_initializer=init))
         net.add(Dense(units=1, activation='linear'))
         net.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.alpha),
-                        loss='mse',
-                        metrics=['mse'])
+                    loss='mse',
+                    metrics=['mse'])
         if not initialise:
             net.load_weights(self.checkpoint_path)
         return net
