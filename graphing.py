@@ -139,24 +139,28 @@ def graph_cured_diseases(data, all_colours, name, last_n=None):
     return
 
 
-def graph_local_average(data, c=10, name=None):
-    current_total = 0
-
-    x = []
-    y = []
-    for i in range(len(data)):
-        current_total += data[i]
-        if i % c == 0 and i > 0:
-            y.append(current_total / c)
-            current_total = 0
-            x.append(i)
-
-    if i % c != 0:
-        y.append(current_total / c)
-        x.append(i)
+def graph_local_average(data_array=[], array_data=False, c=10, name=None):
+    if not array_data:
+        data_array = [data_array]
 
     plt.clf()
-    plt.plot(x, y)
+    for data in data_array:
+        x = []
+        y = []
+        current_total = 0
+        for i in range(len(data)):
+            current_total += data[i]
+            if i % c == 0 and i > 0:
+                y.append(current_total / c)
+                current_total = 0
+                x.append(i)
+
+        if i % c != 0:
+            y.append(current_total / c)
+            x.append(i)
+
+        plt.plot(x, y)
+
     plt.xlabel('Episode Number')
     if name is not None:
         plt.title(name)
