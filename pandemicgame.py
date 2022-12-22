@@ -25,6 +25,12 @@ class PandemicGame:
     max_cubes = 25
     max_outbreaks = 8
 
+    cure_reward = 1.0
+    failure_reward = -1.0
+    step_reward = 0.0
+    # step_reward = -0.1
+    success_reward = 1.0
+
     def __init__(self, colours=all_colours,
                  player_count=2, num_epidemics=4):
 
@@ -287,6 +293,7 @@ class PandemicGame:
         # Get action and param
         # Do action with param
 
+        # Give rewards
         # In turn action
         #   decrement action points
         #   Check for all cured
