@@ -1,4 +1,5 @@
-from citycard import City, CityCard
+from city import City
+from citycard import CityCard
 from deck import Deck
 
 import json
@@ -121,7 +122,7 @@ class PandemicGame:
                             self.shuttle_flight, self.discard_card]] +\
                           [make_dict(self.treat_disease, colour) for colour in self.colours] +\
                           [make_dict(self.trade_card, player) for player in self.players] +\
-                          [make_dict(self.build, None)] +\
+                          [make_dict(self.build, None)]
         for colour in self.colours:
             colour_cities = [city := self.cities[city_name] for city_name in self.cities if city.get_colour() == colour]
             cure_combinations =  list(combinations(colour_cities, PandemicPlayer.cards_needed_to_cure))
