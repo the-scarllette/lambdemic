@@ -1,7 +1,5 @@
 from random import shuffle, randint
 from gameobject import GameObject
-from citycard import CityCard
-from city import City
 from epidemic_card import EpidemicCard
 
 
@@ -17,6 +15,11 @@ class Deck(GameObject):
     def add_card(self, to_add):
         self.__deck.append(to_add)
         self.__cards_in_deck += 1
+        return
+
+    def add_cards(self, *to_add):
+        for card in to_add:
+            self.add_card(card)
         return
 
     def add_epidemics(self, epidemics):

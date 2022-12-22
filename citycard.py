@@ -1,5 +1,5 @@
 from card import Card
-from city import City
+
 
 class CityCard(Card):
 
