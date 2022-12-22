@@ -20,9 +20,13 @@ class PandemicGame:
     game_data_path = 'game_data.json'
 
     infection_rate_track = [2, 2, 2, 3, 3, 4, 4]
+    max_infect_rate_tracker = 6
+
+    cards_drawn_each_turn = 2
 
     max_action_points = 4
     max_cubes = 25
+    max_hand_size = 7
     max_outbreaks = 8
 
     cure_reward = 1.0
@@ -133,7 +137,7 @@ class PandemicGame:
         # Each colour: Is cured
         # Each player: current turn
         self.state_shape = (self.num_cites * ((3 * self.num_colours) + (2 * self.player_count) + 3) +
-                            self.num_colours + self.player_count + PandemicGame.max_action_points + 2)
+                            self.num_colours + self.player_count + PandemicGame.max_action_points + self.num_epidemics + 3)
 
         return
 
@@ -149,6 +153,7 @@ class PandemicGame:
 
         self.num_outbreaks = min(self.num_outbreaks, PandemicGame.max_outbreaks)
         self.cubes[colour] = min(self.cubes[colour], PandemicGame.max_cubes)
+        self.reset_outbreaks()
         return
 
     def build(self, param=None):
@@ -198,8 +203,17 @@ class PandemicGame:
         action_points_array[self.action_points_left] = True
         current_state += action_points_array
 
+        num_epidemics_array = [False] * (self.num_epidemics + 1)
+        num_epidemics_array[self.epidemics_drawn] = True
+        current_state += num_epidemics_array
+
         current_state = np.array(current_state, dtype=np.bool_)
         return current_state
+
+    def increment_infection_rate_tracker(self):
+        self.infection_rate_tracker = min(self.infection_rate_tracker + 1,
+                                          PandemicGame.max_infect_rate_tracker)
+        return
 
     def is_action_possible(self, action, param):
 
@@ -285,30 +299,121 @@ class PandemicGame:
 
         return
 
+    def reset_outbreaks(self):
+        for city_name in self.cities:
+            self.cities[city_name].set_has_outbreaked(False)
+        return
+
     def step(self, action):
         current_possible_actions = self.get_current_possible_actions()
+
         if action not in current_possible_actions:
             raise AttributeError(str(action) + " is and invalid action for current state")
 
+        last_cured = self.cured.copy()
+        info = {'cured': [], 'success': False}
+
         # Get action and param
+        action_param = self.action_key[action]
+        action = action_param['action']
+        parameter = action_param['parameter']
+
         # Do action with param
+        action(parameter)
 
         # Give rewards
+        reward = self.step_reward
+        all_cured = True
+        for colour in self.colours:
+            if self.cured[colour]:
+                info['cured'].append(colour)
+                if not last_cured[colour]:
+                    reward += self.step_reward
+            else:
+                all_cured = False
+        if all_cured:
+            reward += self.success_reward
+            self.terminal = True
+            info['success'] = True
+            return self.get_current_state(), reward, True, info
+
+        # Check if discard needed
+        if self.current_player.get_hand_size() > PandemicGame.max_hand_size:
+            self.discard_card_phase = True
+            return self.get_current_state(), reward, True, info
+
         # In turn action
         #   decrement action points
         #   Check for all cured
+        #   if discard needed:
+        #         # set to discard phase
+        #         # if still need to discard:
+        #         # stay in discard phase
         #   if end of turn
-        #       Draw cards: check for loss
+        #       Draw cards: check for loss, check for epidemic and check for loss
         #       Infect cities: check for loss
-        #       if discard needed:
-        #           set to discard phase
-        #       Else:
-        #           move to next player and reset action points
-        # Else:
-        #   if under hand limit
-        #       Move to next player and reset action points
-        #   Else:
-        #       Stay in discard phase
+        #       move to next player and reset action points
+
+        def is_terminal():
+            over_outbreaks = self.num_outbreaks >= self.max_outbreaks
+            over_cubes = self.cubes[colour] >= self.max_cubes
+            if over_cubes or over_outbreaks:
+                failure_reason = {True: 'cubes', False: 'outbreaks'}
+                info['failure_reason'] = failure_reason[over_cubes]
+                return True
+            return False
+
+
+        # End of player turn
+        if self.action_points_left <= 0 and not self.discard_card_phase:
+            # Drawing cards
+            for _ in range(PandemicGame.cards_drawn_each_turn):
+                card_drawn = self.player_deck.draw_card()
+                if card_drawn is None:  # No card, fail game
+                    reward += self.failure_reward
+                    self.terminal = True
+                    info['failure_reason'] = 'out of player cards'
+                    return self.get_current_state(), reward, True, info
+                elif card_drawn.is_epidemic():  # Epidemic drawn
+                    self.player_deck.discard_card(card_drawn)
+                    self.epidemics_drawn += 1
+
+                    card_to_infect = self.infection_deck.draw_bottom_card()
+                    self.infection_deck.discard(card_to_infect)
+                    city_to_infect = card_to_infect.get_city()
+                    colour_to_infect = city_to_infect.get_colour()
+                    self.add_cubes(city_to_infect, colour_to_infect, 3)
+
+                    self.infection_deck.restack_discard_pile()
+
+                    self.increment_infection_rate_tracker()
+
+                    if is_terminal():
+                        reward += self.failure_reward
+                        self.terminal = True
+                        return self.get_current_state(), reward, True, info
+
+                else:  # Normal card drawn
+                    self.current_player.add_to_hand(card_drawn)
+
+            # Infect cities
+            for _ in range(self.infection_rate_track[self.infection_rate_tracker]):
+                card_drawn = self.infection_deck.draw_and_discard()
+
+                if card_drawn is None:
+                    self.increment_infection_rate_tracker()
+                    self.infection_deck.restack_discard_pile()
+                    break
+
+                city_to_infect = card_drawn.get_city()
+                colour_to_infect = city_to_infect.get_colour()
+                self.add_cubes(city_to_infect, colour_to_infect, 1)
+
+                if is_terminal():
+                    reward += self.failure_reward
+                    self.terminal = True
+                    return self.get_current_state(), reward, True, info
+
         return
 
     def shuttle_flight(self, city):
