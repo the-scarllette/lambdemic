@@ -29,8 +29,8 @@ class City:
     def get_name(self):
         return self.__name
 
-    def equals(self, name):
-        return self.__name == name
+    def equals(self, city):
+        return self.__name == city.get_name()
 
     def has_name(self, name):
         return self.__name == name

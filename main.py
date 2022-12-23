@@ -1,10 +1,11 @@
-from game_v2 import Game
-from graphing import graph_local_average, graph_cured_diseases
-from dqn.dqn_agent import DQNAgent
-from td_lambda.tdlambda import TDLambdaAgent
+
+from graphing import graph_local_average, graph_cured_diseases, graph_rolling_winrate
+from pandemicgame import PandemicGame
 from qlearning.qlearningagent import QlearningAgent
-import random as rand
+
 import json
+import matplotlib.pyplot as plt
+import random as rand
 
 
 def get_run_data(filename, colours):
@@ -128,64 +129,6 @@ def run_dqn(random_episodes, training_episodes, colours, graph_rewards, print_st
 
     if graph_rewards:
         graph_local_average(rewards, c=training_episodes / 25)
-    if save_trajectory:
-        with open(name + '.json', 'w') as file:
-            json.dump(trajectory_data, file)
-    return
-
-
-def run_q_learning(num_episodes, colours,
-                   graph_rewards, print_states, print_actions, save_trajectory):
-    env = Game(colours)
-    action_shape = env.get_action_shape()
-
-    rewards = []
-    cures = []
-    turns_survived = []
-    trajectory_data = {}
-
-    agent = QlearningAgent(action_shape)
-    name = 'q_learning_agent ' + str(num_episodes)
-    for colour in colours:
-        name += ' ' + colour
-    for episode in range(num_episodes):
-        done = False
-        state = env.reset()
-        if print_states:
-            env.print_current_state()
-        steps = 0
-        total_reward = 0
-        trajectory_data[episode] = []
-        while not done:
-            possible_actions, _ = env.get_actions_and_after_states()
-            action = agent.choose_action(state, possible_actions)
-
-            next_state, reward, done, info = env.step(action, print_actions)
-            trajectory_data[episode].append({'state': state.tolist(),
-                                             'action': action,
-                                             'reward': reward,
-                                             'next_state': next_state.tolist(),
-                                             'terminal': done})
-            if print_states:
-                env.print_current_state()
-
-            agent.learn(state, action, reward, next_state)
-            state = next_state
-            total_reward += reward
-            steps += 1
-
-        rewards.append(total_reward)
-        cures.append(info['cured_diseases'])
-        turns_survived.append(steps)
-        print("Episode finished, total reward: " + str(total_reward))
-        print("Turns survived: " + str(steps))
-        print("End game because " + info['terminal_reason'])
-
-    if graph_rewards:
-        graph_local_average(rewards, c=10, name=name + " return sum")
-        graph_cured_diseases(cures, colours, name=name)
-        graph_local_average(turns_survived, c=10, name=(name + " turns survived"))
-
     if save_trajectory:
         with open(name + '.json', 'w') as file:
             json.dump(trajectory_data, file)
@@ -339,23 +282,36 @@ def run_td_lambda(random_episodes, training_episodes, colours, graph_rewards, pr
 
 
 def main():
-    random_episodes = 2500
-    training_episodes = 2500
-    possible_colours = [['blue', 'yellow', 'black']]
+    colours_to_use = ['blue']
 
-    net_layers = [64, 32, 32, 16]
-    use_target_network = False
+    env = PandemicGame(colours_to_use, player_count=2, num_epidemics=4)
 
-    graph_rewards = True
-    print_states = False
-    print_actions = False
+    agent = QlearningAgent(env.num_actions, alpha=0.9, gamma=0.9, epsilon=0.1)
 
-    for colours in possible_colours:
-        run_td_lambda(random_episodes, training_episodes, colours,
-                      graph_rewards, print_states, print_actions,
-                      net_layer=net_layers, epsilon=0.1,
-                      save_trajectory=True)
+    training_episodes = 10000
 
+    returns_per_episode = []
+    successes_per_episode = []
+
+    for _ in range(training_episodes):
+        total_return = 0
+        done = False
+        state = env.reset()
+        while not done:
+            possible_actions = env.get_current_possible_actions()
+            action = agent.choose_action(state, possible_actions)
+
+            next_state, reward, done, info = env.step(action)
+            total_return += reward
+
+            agent.learn(state, action, reward, next_state)
+            state = next_state
+
+        returns_per_episode.append(total_return)
+        successes_per_episode.append(info['success'])
+
+    graph_local_average(returns_per_episode, c=1, name='Returns per episode')
+    graph_rolling_winrate(successes_per_episode, 10, 'Winrate')
     return
 
 

@@ -75,7 +75,7 @@ class PandemicGame:
                         connected_cities.append(to_connect)
                     except KeyError:
                         continue
-                self.cities[city_name].set_connenected_cities(connected_cities)
+                self.cities[city_name].set_connected_cities(connected_cities)
         # Getting start city name
         for colour in PandemicGame.starting_cities:
             if colour in self.colours:
@@ -124,8 +124,9 @@ class PandemicGame:
                           [make_dict(self.trade_card, player) for player in self.players] +\
                           [make_dict(self.build, None)]
         for colour in self.colours:
-            colour_cities = [city := self.cities[city_name] for city_name in self.cities if city.get_colour() == colour]
-            cure_combinations =  list(combinations(colour_cities, PandemicPlayer.cards_needed_to_cure))
+            colour_cities = [city for city_name in self.cities
+                             if (city := self.cities[city_name]).get_colour() == colour]
+            cure_combinations = list(combinations(colour_cities, PandemicPlayer.cards_needed_to_cure))
             self.action_key += [make_dict(self.cure, (colour, ) + cure_combination)
                                 for cure_combination in cure_combinations]
         self.num_actions = len(self.action_key)
@@ -169,7 +170,7 @@ class PandemicGame:
 
         city_to_build_name = self.current_player.get_city().get_name()
         city_to_build = self.cities[city_to_build_name]
-        city_to_build.set_has_research_station(True)
+        city_to_build.set_has_res_station(True)
         self.research_stations.append(city_to_build)
         return
 
@@ -208,8 +209,8 @@ class PandemicGame:
 
     def get_current_possible_actions(self):
         current_possible_actions = []
-        for i in range(self.possible_actions):
-            action_param = self.possible_actions[i]
+        for i in self.possible_actions:
+            action_param = self.action_key[i]
             if self.is_action_possible(action_param['action'], action_param['parameter']):
                 current_possible_actions.append(i)
         return current_possible_actions
@@ -221,7 +222,8 @@ class PandemicGame:
             city = self.cities[city_name]
             city_state_array = [city.get_cubes(colour) == cube_num
                                 for colour in self.colours for cube_num in range(1, 4)]
-            city_state_array += ([player.in_city(city), player.is_city_in_hand(city)] for player in self.players)
+            city_state_array += [player.in_city(city) for player in self.players]
+            city_state_array += [player.is_city_in_hand(city) for player in self.players]
             city_state_array += [city.has_research_station(),
                                  self.player_deck.city_in_discard_pile(city),
                                  self.infection_deck.city_in_discard_pile(city)]
@@ -259,7 +261,9 @@ class PandemicGame:
             return False
 
         if action == self.move_player:
-            return any(self.current_player.in_city(city) for city in param.get_connected_cities())
+            connected_cities = param.get_connected_cities()
+            can_move = any([self.current_player.in_city(city) for city in connected_cities])
+            return can_move
         elif action == self.direct_flight:
             return self.current_player.is_city_in_hand(param)
         elif action == self.charter_flight:
@@ -278,11 +282,11 @@ class PandemicGame:
             return self.current_player.get_city().get_cubes(param) > 0
         elif action == self.cure:
             colour_to_cure = param[0]
-            cards_to_use = param[1, 5]
+            cards_to_use = param[1: 5]
             return (not self.cured[colour_to_cure]) and \
-                   self.current_player.get_city().has_research_station and \
-                   self.current_player.can_cure(colour_to_cure) and \
-                   all(self.current_player.is_city_in_hand(city) for city in cards_to_use)
+                    self.current_player.get_city().has_research_station and \
+                    self.current_player.can_cure(colour_to_cure) and \
+                    all(self.current_player.is_city_in_hand(city) for city in cards_to_use)
 
         return False
 
@@ -302,13 +306,13 @@ class PandemicGame:
     def reset(self):
         # Resetting Cities
         for city in self.cities:
-            city.reset()
+            self.cities[city].reset()
 
         # New Player and Infection Deck
         self.player_deck = Deck()
         self.infection_deck = Deck()
         for deck in [self.player_deck, self.infection_deck]:
-            deck.add_cards(CityCard(city) for city in self.cities)
+            deck.add_cards([CityCard(self.cities[city]) for city in self.cities])
             deck.shuffle()
 
         # Cure Tracker
@@ -322,15 +326,15 @@ class PandemicGame:
 
         # Research Stations
         self.research_stations = [self.start_city]
-        self.start_city.set_has_research_station(True)
+        self.start_city.set_has_res_station(True)
 
         # New Player hands
         for player in self.players:
             player.reset(self.start_city)
         cards_per_player = range((6 - self.player_count))
         for player in self.players:
-            player.add_multiple_to_hand(self.player_deck.draw_card()
-                                        for _ in cards_per_player)
+            player.add_multiple_to_hand([self.player_deck.draw_card()
+                                         for _ in cards_per_player])
 
         # New Current Turn
         self.current_turn = 0
@@ -343,14 +347,16 @@ class PandemicGame:
         # Infect Cities
         self.cubes = {colour: 0 for colour in self.colours}
         for cubes_to_place in range(1, 4):
-            city_to_infect = self.infection_deck.draw_and_discard().get_city()
+            card_to_infect = self.infection_deck.draw_and_discard()
+            city_to_infect = card_to_infect.get_city()
             self.add_cubes(city_to_infect, city_to_infect.get_colour(), cubes_to_place)
 
         # Game not terminal
         self.discard_card_phase = False
         self.terminal = False
+        self.action_points_left = PandemicGame.max_action_points
 
-        return
+        return self.get_current_state()
 
     def reset_outbreaks(self):
         for city_name in self.cities:
@@ -428,12 +434,12 @@ class PandemicGame:
                     info['failure_reason'] = 'out of player cards'
                     return self.get_current_state(), reward, True, info
 
-                elif card_drawn.is_epidemic():  # Epidemic drawn
+                elif card_drawn.is_epidemic:  # Epidemic drawn
                     self.player_deck.discard_card(card_drawn)
                     self.epidemics_drawn += 1
 
                     card_to_infect = self.infection_deck.draw_bottom_card()
-                    self.infection_deck.discard(card_to_infect)
+                    self.infection_deck.discard_card(card_to_infect)
                     city_to_infect = card_to_infect.get_city()
                     colour_to_infect = city_to_infect.get_colour()
                     self.add_cubes(city_to_infect, colour_to_infect, 3)
@@ -529,7 +535,7 @@ class PandemicPlayer:
         self.__cards_in_hand += 1
         return
 
-    def add_multiple_to_hand(self, *cards):
+    def add_multiple_to_hand(self, cards):
         for card in cards:
             self.add_to_hand(card)
         return

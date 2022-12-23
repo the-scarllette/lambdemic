@@ -139,6 +139,37 @@ def graph_cured_diseases(data, all_colours, name, last_n=None):
     return
 
 
+def graph_rolling_winrate(successes, last_n, name=None):
+    plt.clf()
+
+    total_games = len(successes)
+
+    win_count = 0
+    for i in range(last_n):
+        if successes[i]:
+            win_count += 1
+
+    x = [0]
+    y = [(win_count / last_n) * 100]
+    for i in range(last_n, total_games):
+        if successes[i - last_n]:
+            win_count -= 1
+        if successes[i]:
+            win_count += 1
+
+        x.append(i - last_n)
+        y.append((win_count / last_n) * 100)
+
+    plt.ylabel('Winrate %')
+
+    plt.plot(x, y)
+    if name is not None:
+        plt.title(name)
+    plt.show()
+    plt.savefig(name + ".png")
+    return
+
+
 def graph_local_average(data_array=[], array_data=False, c=10, name=None):
     if not array_data:
         data_array = [data_array]

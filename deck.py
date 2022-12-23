@@ -17,7 +17,7 @@ class Deck(GameObject):
         self.__cards_in_deck += 1
         return
 
-    def add_cards(self, *to_add):
+    def add_cards(self, to_add):
         for card in to_add:
             self.add_card(card)
         return
